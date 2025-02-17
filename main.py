@@ -1,4 +1,5 @@
-import re
+from analizador import *
+
 
 texto = """
 int suma(int a, int b) {
@@ -7,7 +8,7 @@ int suma(int a, int b) {
   d = a - b;
   int e = a * b;
   int f = a / b;
-
+  
   if (c >= d) {
     a = b + c;
     int z = d / a;
@@ -22,45 +23,21 @@ int suma(int a, int b) {
     e = e + 1;
   }
 
-  for(int i = 0; i < 10; i = i + 3) print(i);
+  for(int i = 0; i < 10; i = i + 3) {
+  print(i);
+  }
+  
 
   print("El resultado de la suma es: ");
 
   return f;
 }
 """
-# Op relacional = <, >, =, !, <=, >=, ==, !=,
-# Op lógicos = &, &&, |, ||, !
-# Definir patrones de tokens
-token_patron = {
-    "KEYWORD": r'\b(if|else|while|for|return|int|float|void|class|def|print)\b',
-    "IDENTIFIER": r'\b[a-zA-Z_][a-zA-Z0-9_]*\b',
-    "NUMBER": r'\b\d+\b',
-    "OPERATOR": r'<=|>=|==|!=|&&|"|[\+\-\*/=<>\!\||\|\']',
-    "DELIMITER": r'[(),;{}]',  # Paréntesis, llaves, punto y coma
-    "WHITESPACE": r'\s+'  # Espacios en blanco
-}
 
-
-def tokenize(text):
-    patron_general = "|".join(f"(?P<{token}>{patron})" for token, patron in token_patron.items())
-    patron_regex = re.compile(patron_general)
-
-    tokens_encontrados = []
-
-    for match in patron_regex.finditer(text):
-        for token, valor in match.groupdict().items():
-            if valor is not None and token != "WHITESPACE":
-                tokens_encontrados.append((token, valor))
-
-    return tokens_encontrados
-
-
-tokens = tokenize(texto)
+token = tokenize(texto)
 
 
 # Analizador sintáctico
-
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -124,13 +101,13 @@ class Parser:
                 elif self.obtener_token_actual()[1] == 'print':
                     self.sentencia_print()
                 else:
-                    break;
+                    break
             else:
-                break;
+                break
         if self.obtener_token_actual() and self.obtener_token_actual()[1] == 'return':
             self.coincidir('KEYWORD')  # return
             self.coincidir('IDENTIFIER')  # Identificador <nombre de la variable>
-            if (self.obtener_token_actual() and self.obtener_token_actual()[0] == 'OPERATOR'):
+            if self.obtener_token_actual() and self.obtener_token_actual()[0] == 'OPERATOR':
                 self.coincidir('OPERATOR')  # Operador ej. +
                 self.coincidir('IDENTIFIER')  # Identificador <nombre de la variable
             self.coincidir('DELIMITER')  # Final del statement ";"
@@ -219,7 +196,7 @@ class Parser:
 #  Aquí se prueba
 try:
     print('Se inicia el análisis sintáctico')
-    parser = Parser(tokens)
+    parser = Parser(token)
     parser.parsear()
     print('Análisis sintáctico exitoso')
 except SyntaxError as e:
