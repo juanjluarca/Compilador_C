@@ -1,37 +1,39 @@
+import json
+
 from analizador import *
 
 
 texto = """
-int suma(int a, int b) {
-  int c = a + b;
-  int d;
-  d = a - b;
-  int e = a * b;
-  int f = a / b;
-  
-  if (c >= d) {
-    a = b + c;
-    int z = d / a;
-    if (z < b) {
-      b = a - b;
+
+int main () {
+    int a = 3;
+    if (a == 8) {
+        print("a es igual a 8");
     } else {
-      b = a + b;
+        print("a no es igual a 8");
+    return a + b;
     }
-  }
-
-  while (e <= f) {
-    e = e + 1;
-  }
-
-  for(int i = 0; i < 10; i = i + 3) {
-  print(i);
-  }
-  
-
-  print("El resultado de la suma es: ");
-
-  return f;
 }
+
+
+
+int suma (int a, int b) {
+    for (int i = 0; i < 5; i = i + 1) {
+    print("El valor de i es:");
+    }
+    return a + b;
+}
+
+"""
+texto2 = """
+void main() { 
+while (x < 8) {
+    x = x + 1;
+    }
+    int s = suma(3, 4);
+    print(s);
+    } 
+
 """
 
 token = tokenize(texto)
@@ -56,148 +58,229 @@ class Parser:
 
     def parsear(self):
         # Punto de entrada del analizador: se espera una función
-        self.funcion()
+        return self.programa()
+    
+    def programa(self):
+        funciones = []
+        hay_main = False
+        while self.obtener_token_actual():
+            funcion = self.funcion()
+            if funcion.nombre[1] == 'main':
+                hay_main = True
+            funciones.append(funcion)
+        if not hay_main:
+            raise SyntaxError('Error sintáctico: se requiere una función main')
+        return NodoPrograma(funciones)
 
     # Función para reconocer declaraciones de variables dentro del cuerpo de la función y evaluar operaciones aritméticas más complejas:
     def funcion(self):
         # Gramática para una función: int IDENTIFICADOR (int IDENTIFICADOR*) {cuerpo}
-        self.coincidir('KEYWORD')  # Tipo de retorno (ej. int)
-        self.coincidir('IDENTIFIER')  # Nombre de la función
-        self.coincidir('DELIMITER')  # Se espera un "("
-        self.parametros()
-        self.coincidir('DELIMITER')  # Se espera un ")"
-        self.cuerpo()
+        tipo_retorno = self.coincidir('KEYWORD')  # Tipo de retorno (ej. int)
+        nombre_funcion = self.coincidir('IDENTIFIER')  # Nombre de la función
+        print(nombre_funcion)
+        if nombre_funcion[1] == 'main':
+            self.coincidir('DELIMITER') # Se espera un "("
+            self.coincidir('DELIMITER') # Se espera un ")"
+            self.coincidir('DELIMITER') # Se espera un "{"
+            parametros = []
+        else:
+            self.coincidir('DELIMITER')  # Se espera un "("
+            parametros = self.parametros()
+            self.coincidir('DELIMITER')  # Se espera un ")"
+            self.coincidir('DELIMITER')  # Se espera un "{"
+        cuerpo = self.cuerpo()
+        self.coincidir('DELIMITER')  # Se espera un "}"
+        return NodoFuncion(nombre_funcion, parametros, cuerpo)
 
     def parametros(self):
+        parametros = []
         # Reglas para parámetros: int IDENTIFIER(, int IDENTIFIER)*
-        self.coincidir('KEYWORD')  # Tipo del parámetro
-        self.coincidir('IDENTIFIER')  # Nombre del parámetro
+        tipo = self.coincidir('KEYWORD')  # Tipo del parámetro
+        nombre = self.coincidir('IDENTIFIER')  # Nombre del parámetro
+        parametros.append(NodoParametro(tipo, nombre))
         while self.obtener_token_actual() and self.obtener_token_actual()[1] == ',':
             self.coincidir('DELIMITER')  # Espera una ","
-            self.coincidir('KEYWORD')  # Tipo del parámetro
-            self.coincidir('IDENTIFIER')  # Nombre del parámetro
+            tipo = self.coincidir('KEYWORD')  # Tipo del parámetro
+            nombre = self.coincidir('IDENTIFIER')  # Nombre del parámetro
+            parametros.append(NodoParametro(tipo, nombre))
+        return parametros
 
     # Función para reconocer declaraciones de variables dentro del cuerpo de la función y evaluar operaciones aritméticas más complejas:
 
+
     def cuerpo(self):
-        # Gramática para el cuerpo de la función: return IDENTIFIER OPERATOR IDENTIFIER
-        # Reconocer declaraciones de variables dentro del cuerpo de la función y evaluar operaciones aritméticas más complejas:
-        if self.obtener_token_actual() and self.obtener_token_actual()[1] == '{':
-            self.coincidir('DELIMITER')  # Se espera un "{"
-        while self.obtener_token_actual() and self.obtener_token_actual()[1] != 'return' and \
-                self.obtener_token_actual()[1] != '}':
-            if self.obtener_token_actual()[1] == 'int':
-                self.declaracion_variable()
-            elif self.obtener_token_actual()[0] == 'IDENTIFIER':
-                self.coincidir('IDENTIFIER')  # Identificador <nombre de la variable>
-                self.operacion_aritmetica()
-            elif self.obtener_token_actual()[0] == 'KEYWORD':
-                if self.obtener_token_actual()[1] == 'if':
-                    self.sentencia_if()
-                elif self.obtener_token_actual()[1] == 'while':
-                    self.sentencia_while()
-                elif self.obtener_token_actual()[1] == 'for':
-                    self.sentencia_for()
-                elif self.obtener_token_actual()[1] == 'print':
-                    self.sentencia_print()
-                else:
-                    break
+        instrucciones = []
+        while self.obtener_token_actual() and self.obtener_token_actual()[1] != "}":
+            if self.obtener_token_actual()[1] == "return":
+                instrucciones.append(self.retorno())
+            elif self.obtener_token_actual()[1] == 'while':
+                instrucciones.append(self.sentencia_while())
+            elif self.obtener_token_actual()[1] == 'for':
+                instrucciones.append(self.sentencia_for())
+            elif self.obtener_token_actual()[1] == 'if':
+                instrucciones.append(self.sentencia_if())
+            elif self.obtener_token_actual()[1] == 'print':
+                instrucciones.append(self.sentencia_print())
             else:
-                break
-        if self.obtener_token_actual() and self.obtener_token_actual()[1] == 'return':
-            self.coincidir('KEYWORD')  # return
-            self.coincidir('IDENTIFIER')  # Identificador <nombre de la variable>
-            if self.obtener_token_actual() and self.obtener_token_actual()[0] == 'OPERATOR':
-                self.coincidir('OPERATOR')  # Operador ej. +
-                self.coincidir('IDENTIFIER')  # Identificador <nombre de la variable
-            self.coincidir('DELIMITER')  # Final del statement ";"
-        if self.obtener_token_actual() and self.obtener_token_actual()[1] == '}':
-            self.coincidir('DELIMITER')  # Se espera un "}"
+                instrucciones.append(self.asignacion())
+        return instrucciones
+
+    def retorno(self):
+        self.coincidir('KEYWORD') # return
+        expresion = self.expresion()
+        self.coincidir('DELIMITER') # Final del statement ";"
+        return NodoRetorno(expresion)
+
+
+    def asignacion(self):
+        if self.obtener_token_actual()[0] == "KEYWORD":
+            tipo = self.coincidir("KEYWORD")
+        nombre = self.coincidir("IDENTIFIER")
+        self.coincidir("OPERATOR")
+        expresion = self.expresion()
+        self.coincidir("DELIMITER")
+        return NodoAsignacion(nombre, expresion)
+
+    def expresion(self):
+        izquierda = self.termino()
+        while self.obtener_token_actual() and self.obtener_token_actual()[0] == "OPERATOR":
+            operador = self.coincidir("OPERATOR")
+            derecha = self.termino()
+            izquierda = NodoOperacion(izquierda, operador, derecha)
+        return izquierda
+
+    def termino(self):
+        token = self.obtener_token_actual()
+        if token[0] == "IDENTIFIER":
+            return NodoIdentificador(self.coincidir("IDENTIFIER"))
+        elif token[0] == "NUMBER":
+            return NodoNumero(int(self.coincidir("NUMBER")[1]))
+        else:
+            raise SyntaxError(f"Error de sintaxis: se esperaba un identificador o un número, pero se encontró {token}")
 
     def sentencia_if(self):
         self.coincidir('KEYWORD')  # if
         self.coincidir('DELIMITER')  # (
-        self.condicion_a_evaluar()  # Condición ej x < 8
+        condicion = self.expresion()  # Condición ej x < 8
         self.coincidir('DELIMITER')  # )
-        self.cuerpo()
+        self.coincidir('DELIMITER')  # {
+        cuerpo = self.cuerpo()
+        self.coincidir('DELIMITER')  # Se espera un "}"
         if self.obtener_token_actual() and self.obtener_token_actual()[1] == 'else':
             self.coincidir('KEYWORD')  # else
-            self.cuerpo()
+            self.coincidir('DELIMITER') # {
+            sino = self.cuerpo()
+            self.coincidir('DELIMITER') # }
+            return NodoIf(condicion, cuerpo, sino)
+        return NodoIf(condicion, cuerpo)
 
     def sentencia_while(self):
         self.coincidir('KEYWORD')  # while
         self.coincidir('DELIMITER')  # (
-        self.condicion_a_evaluar()  # Condición ej x < 8
+        condicion = self.expresion()  # Condición ej x < 8
         self.coincidir('DELIMITER')  # )
-        self.cuerpo()
+        self.coincidir('DELIMITER')  # {
+        cuerpo = self.cuerpo()
+        self.coincidir('DELIMITER')  # Se espera un "}"
+
+        return NodoWhile(condicion, cuerpo)
+    
+    def contenido(self):
+        token = self.obtener_token_actual()
+        if token[0] == "OPERATOR":
+            return self.coincidir("OPERATOR")[1]
+        elif token[0] == "IDENTIFIER":
+            return self.coincidir("IDENTIFIER")[1]
+        elif token[0] == "NUMBER":
+            return self.coincidir("NUMBER")[1]
+        else:
+            return ""
+
+    # print("a es igual a 8");
+    def sentencia_print(self):
+        self.coincidir('KEYWORD')  # print
+        self.coincidir('DELIMITER')  # (
+        texto = []
+        self.coincidir('OPERATOR')  # "
+        while self.obtener_token_actual() and self.obtener_token_actual()[1] != '"':
+            texto.append(self.contenido())
+        elementos = " ".join(texto)
+        self.coincidir('OPERATOR')  # "
+        self.coincidir('DELIMITER')  # )
+        self.coincidir('DELIMITER')  # ;
+        return NodoPrint(elementos)
 
     def sentencia_for(self):
         self.coincidir('KEYWORD')  # for
         self.coincidir('DELIMITER')  # (
+        # Inicialización (ej: int i = 0)
         self.coincidir('KEYWORD')  # int
-        self.coincidir('IDENTIFIER')  # Identificador <nombre de la variable>
-        self.coincidir('OPERATOR')  # Asignación ej =
-        self.number_or_identifier()  # Número o identificador
+        identificador = self.coincidir('IDENTIFIER')  # Nombre de la variable
+        self.coincidir('OPERATOR')  # Asignación (=)
+        inicializacion = self.termino()  # Número o identificador
         self.coincidir('DELIMITER')  # ;
-        self.condicion_a_evaluar()  # Condición ej x < 8
+        # Condición (ej: i < 8)
+        condicion = self.expresion()
         self.coincidir('DELIMITER')  # ;
-        self.coincidir('IDENTIFIER')  # i
-        self.coincidir('OPERATOR')  # =
-        self.condicion_a_evaluar()
+        # Actualización (ej: i = i + 1)
+        variable_actualizacion = self.coincidir('IDENTIFIER')  # Variable de control
+        self.coincidir('OPERATOR')  # Operador de asignación (=)
+        actualizacion = self.expresion()
         self.coincidir('DELIMITER')  # )
-        self.cuerpo()
+        self.coincidir('DELIMITER')  # {
+        cuerpo = self.cuerpo()
+        self.coincidir('DELIMITER')  # }
 
-    def sentencia_print(self):
-        self.coincidir('KEYWORD')  # print
-        self.coincidir('DELIMITER')  # (
-        if self.obtener_token_actual() and self.obtener_token_actual()[1] == '"':
-            self.coincidir('OPERATOR')  # OPERADOR "
-            while self.obtener_token_actual() and (
-                    self.obtener_token_actual()[0] == 'IDENTIFIER' or self.obtener_token_actual()[0] == 'NUMBER'):
-                self.number_or_identifier()
-            self.coincidir('OPERATOR')  # OPERADOR "
-        else:
-            self.number_or_identifier()
-        self.coincidir('DELIMITER')  # )
-        self.coincidir('DELIMITER')  # ;
+        return NodoFor((identificador, inicializacion), condicion, (variable_actualizacion, actualizacion), cuerpo)
 
-    def declaracion_variable(self):
-        # Gramática para declaraciones de variables: IDENTIFIER OPERATOR IDENTIFIER
-        self.coincidir('KEYWORD')  # palabra para declarar variable ej. int
-        self.coincidir('IDENTIFIER')  # Identificador <nombre de la variable>
-        if self.obtener_token_actual() and self.obtener_token_actual()[0] == 'DELIMITER':
-            self.coincidir('DELIMITER')  # Final del statement ";"
-        elif self.obtener_token_actual() and self.obtener_token_actual()[0] == 'NUMBER':
-            self.coincidir('NUMBER')  # Valor numérico de la variable
-            self.coincidir('DELIMITER')  # Final del statement ";"
-        else:
-            self.operacion_aritmetica()
+def imprimir_ast(nodo):
+    if isinstance(nodo, NodoPrograma):
+        return {'Programa': [imprimir_ast(f) for f in nodo.funciones]}
+    elif isinstance(nodo, NodoFuncion):
+        return {'Funcion': nodo.nombre,
+                'Parametros': [imprimir_ast(p) for p in nodo.parametros],
+                'Cuerpo': [imprimir_ast(c) for c in nodo.cuerpo]}
+    elif isinstance(nodo, NodoParametro):
+        return {'Parametro': nodo.nombre, 'Tipo': nodo.tipo}
+    elif isinstance(nodo, NodoWhile):
+        return {'While': [imprimir_ast(nodo.condicion), [imprimir_ast(c) for c in nodo.cuerpo]]}
+    elif isinstance(nodo, NodoIf):
+        return {'If': [imprimir_ast(nodo.condicion), [imprimir_ast(c) for c in nodo.cuerpo]], 'Else': [imprimir_ast(c) for c in nodo.sino]}
+    elif isinstance(nodo, NodoAsignacion):
+        return {'Asignacion': nodo.nombre,
+                'Expresion': imprimir_ast(nodo.expresion)}
+    elif isinstance(nodo, NodoPrint):
+        return {'Print': nodo.expresion}
+    elif isinstance(nodo, NodoTexto):
+        return {'Texto': nodo.valor}
+    elif isinstance(nodo, NodoFor):
+        return {'For': {
+                    'Inicializacion': imprimir_ast(nodo.inicializacion),
+                    'Condicion': imprimir_ast(nodo.condicion),
+                    'Actualizacion': imprimir_ast(nodo.actualizacion),
+                    'Cuerpo': [imprimir_ast(c) for c in nodo.cuerpo]
+                }}
+    elif isinstance(nodo, NodoOperacion):
+        return {'Operacion': nodo.operador,
+                'Izquierda': imprimir_ast(nodo.izquierda),
+                'Derecha': imprimir_ast(nodo.derecha)}
+    elif isinstance(nodo, NodoRetorno):
+        return {'Return': imprimir_ast(nodo.expresion)}
+    elif isinstance(nodo, NodoIdentificador):
+        return {'Identificador': nodo.nombre}
+    elif isinstance(nodo, NodoNumero):
+        return {'Numero': nodo.valor}
 
-    def operacion_aritmetica(self):
-        # Gramática para operaciones aritméticas: IDENTIFIER OPERATOR IDENTIFIER
-        self.coincidir('OPERATOR')  # Asignación ej =
-        self.number_or_identifier()
-        self.coincidir('OPERATOR')  # Operador ej. +
-        self.number_or_identifier()
-        self.coincidir('DELIMITER')  # Final del statement ";"
-
-    def condicion_a_evaluar(self):
-        self.number_or_identifier()
-        self.coincidir('OPERATOR')
-        self.number_or_identifier()
-
-    def number_or_identifier(self):
-        if self.obtener_token_actual() and self.obtener_token_actual()[0] == 'NUMBER':
-            self.coincidir('NUMBER')
-        else:
-            self.coincidir('IDENTIFIER')
-
+    return {}
 
 #  Aquí se prueba
 try:
     print('Se inicia el análisis sintáctico')
     parser = Parser(token)
-    parser.parsear()
+    arbol_ast = parser.parsear()
     print('Análisis sintáctico exitoso')
+    print(json.dumps(imprimir_ast(arbol_ast), indent=1))
+
 except SyntaxError as e:
     print(e)
+

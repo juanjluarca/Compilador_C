@@ -30,6 +30,11 @@ class NodoAST:
     # Clase base para todos los nodos del AST
     pass
 
+class NodoPrograma(NodoAST):
+    # Nodo que representa el programa como un conjunto de funciones
+    def __init__(self, funciones):
+        self.funciones = funciones
+
 
 class NodoFuncion(NodoAST):
     # Nodo que representa una función
@@ -59,4 +64,52 @@ class NodoOperacion(NodoAST):
         self.izquierda = izquierda
         self.operador = operador
         self.derecha = derecha
+
+
+class NodoRetorno(NodoAST):
+    # Nodo que representa a la sentencia return
+    def __init__(self, expresion):
+        self.expresion = expresion
+
+
+class NodoIdentificador(NodoAST):
+    # Nodo que representa a un identificador
+    def __init__(self, nombre):
+        self.nombre = nombre
+
+class NodoWhile(NodoAST):
+    # Nodo que representa a un ciclo while
+    def __init__(self, condicion, cuerpo):
+        self.condicion = condicion
+        self.cuerpo = cuerpo
+
+class NodoIf(NodoAST):
+    # Nodo que representa a una sentencia if
+    def __init__(self, condicion, cuerpo, sino=None):
+        self.condicion = condicion
+        self.cuerpo = cuerpo
+        self.sino = sino
+
+class NodoFor(NodoAST):
+    # Nodo que representa a un ciclo for
+    def __init__(self, inicializacion, condicion, actualizacion, cuerpo):
+        self.inicializacion = inicializacion
+        self.condicion = condicion
+        self.actualizacion = actualizacion
+        self.cuerpo = cuerpo
+
+class NodoPrint(NodoAST):
+    # Nodo que representa a la función print
+    def __init__(self, expresion):
+        self.expresion = expresion
+
+class NodoTexto(NodoAST):
+    # Nodo que representa un texto
+    def __init__(self, valor):
+        self.valor = valor
+    
+class NodoNumero(NodoAST):
+    # Nodo que representa un número
+    def __init__(self, valor):
+        self.valor = valor
 
