@@ -6,17 +6,9 @@ from analizador import *
 texto = """
 
 int main () {
-    int a = 3;
-    if (a == 8) {
-        print("a es igual a 8");
-    } else {
-        print("a no es igual a 8");
-    return a + b;
-    }
+    int x = b + 4 * 1 + 0;
+    
 }
-
-
-
 int suma (int a, int b) {
     for (int i = 0; i < 5; i = i + 1) {
     print("El valor de i es:");
@@ -255,9 +247,9 @@ def imprimir_ast(nodo):
         return {'Texto': nodo.valor}
     elif isinstance(nodo, NodoFor):
         return {'For': {
-                    'Inicializacion': imprimir_ast(nodo.inicializacion),
+                    'Inicializacion': f"{nodo.inicializacion[0]} {imprimir_ast(nodo.inicializacion[1])}",
                     'Condicion': imprimir_ast(nodo.condicion),
-                    'Actualizacion': imprimir_ast(nodo.actualizacion),
+                    'Actualizacion': f"{nodo.actualizacion[0]} {imprimir_ast(nodo.actualizacion[1])}",
                     'Cuerpo': [imprimir_ast(c) for c in nodo.cuerpo]
                 }}
     elif isinstance(nodo, NodoOperacion):
@@ -278,8 +270,13 @@ try:
     print('Se inicia el análisis sintáctico')
     parser = Parser(token)
     arbol_ast = parser.parsear()
-    print('Análisis sintáctico exitoso')
-    print(json.dumps(imprimir_ast(arbol_ast), indent=1))
+    nodo_exp = NodoOperacion(NodoNumero(2), '+', NodoNumero(0))
+    print(json.dumps(imprimir_ast(nodo_exp), indent=1))
+    exp_op = nodo_exp.optimizar()
+    print(json.dumps(imprimir_ast(exp_op), indent=1))
+    
+    # print('Análisis sintáctico exitoso')
+    # print(json.dumps(imprimir_ast(arbol_ast), indent=1))
 
 except SyntaxError as e:
     print(e)

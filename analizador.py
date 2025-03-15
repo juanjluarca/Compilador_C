@@ -65,6 +65,40 @@ class NodoOperacion(NodoAST):
         self.operador = operador
         self.derecha = derecha
 
+    def optimizar(self):
+        if isinstance(self.izquierda, NodoOperacion):
+            self.izquierda = self.izquierda.optimizar()
+        else:
+            izquierda = self.izquierda
+        if isinstance(self.derecha, NodoOperacion):
+            self.derecha = self.derecha.optimizar()
+        else:
+            derecha = self.derecha
+
+        # Si ambos operandos son números, evaluamos la operación
+        if isinstance(izquierda, NodoNumero) and isinstance(derecha, NodoNumero):
+            if self.operador == "+":
+                return NodoNumero(izquierda.valor + derecha.valor)
+            elif self.operador == "-":
+                return NodoNumero(izquierda.valor - derecha.valor)
+            elif self.operador == "*":
+                return NodoNumero(izquierda.valor * derecha.valor)
+            elif self.operador == "/" and derecha.valor != 0:
+                return NodoNumero(izquierda.valor / derecha.valor)
+        # Simplificación algebraica
+        if self.operador == '*' and isinstance(derecha, NodoNumero) and derecha.valor == 1:
+            return izquierda
+        if self.operador == '*' and isinstance(izquierda, NodoNumero) and izquierda.valor == 1:
+            return derecha
+        if self.operador == '+' and isinstance(derecha, NodoNumero) and derecha.valor == 0:
+            return izquierda
+        if self.operador == '+' and isinstance(izquierda, NodoNumero) and izquierda.valor == 0:
+            return derecha
+
+        return NodoOperacion(izquierda, self.operador, derecha)
+        
+        
+        
 
 class NodoRetorno(NodoAST):
     # Nodo que representa a la sentencia return
