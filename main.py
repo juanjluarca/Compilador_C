@@ -5,15 +5,13 @@ from analizador import *
 
 texto = """
 
-int main () {
-    int x = b + 4 * 1 + 0;
-    
-}
 int suma (int a, int b) {
-    for (int i = 0; i < 5; i = i + 1) {
-    print("El valor de i es:");
+    int c = a + b;
+    if (c > 10) {
+        return c;
+    } else {
+        return 0;
     }
-    return a + b;
 }
 
 """
@@ -60,9 +58,9 @@ class Parser:
             if funcion.nombre[1] == 'main':
                 hay_main = True
             funciones.append(funcion)
-        if not hay_main:
-            raise SyntaxError('Error sintáctico: se requiere una función main')
-        return NodoPrograma(funciones)
+        # if not hay_main:
+        #     raise SyntaxError('Error sintáctico: se requiere una función main')
+        return NodoPrograma(funciones) #
 
     # Función para reconocer declaraciones de variables dentro del cuerpo de la función y evaluar operaciones aritméticas más complejas:
     def funcion(self):
@@ -270,10 +268,13 @@ try:
     print('Se inicia el análisis sintáctico')
     parser = Parser(token)
     arbol_ast = parser.parsear()
-    nodo_exp = NodoOperacion(NodoNumero(2), '+', NodoNumero(0))
-    print(json.dumps(imprimir_ast(nodo_exp), indent=1))
-    exp_op = nodo_exp.optimizar()
-    print(json.dumps(imprimir_ast(exp_op), indent=1))
+    codigo_asm = arbol_ast.generar_codigo()
+    print(codigo_asm)
+    
+    # nodo_exp = NodoOperacion(NodoNumero(2), '+', NodoNumero(0))
+    # print(json.dumps(imprimir_ast(nodo_exp), indent=1))
+    # exp_op = nodo_exp.optimizar()
+    # print(json.dumps(imprimir_ast(exp_op), indent=1))
     
     # print('Análisis sintáctico exitoso')
     # print(json.dumps(imprimir_ast(arbol_ast), indent=1))

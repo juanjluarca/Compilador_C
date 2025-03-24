@@ -28,13 +28,22 @@ def tokenize(text):
 
 class NodoAST:
     # Clase base para todos los nodos del AST
-    pass
+    def traducir(self):
+        raise NotImplementedError("Método traducir no implementado en este nodo")
+    
+    def generar_codigo(self):
+        raise NotImplementedError("Método generar_codigo no implementado en este nodo")
 
 class NodoPrograma(NodoAST):
     # Nodo que representa el programa como un conjunto de funciones
     def __init__(self, funciones):
         self.funciones = funciones
 
+    def traducir(self):
+        return "\n\n".join(f.traducir() for f in self.funciones)
+
+    def generar_codigo(self):
+        return "\n\n".join(f.generar_codigo() for f in self.funciones)
 
 class NodoFuncion(NodoAST):
     # Nodo que representa una función
@@ -43,6 +52,16 @@ class NodoFuncion(NodoAST):
         self.parametros = parametros
         self.cuerpo = cuerpo
 
+    def traducir(self):
+        params = ", ".join(p.traducir() for p in self.parametros)
+        cuerpo = "\n   ".join(c.traducir() for c in self.cuerpo)
+        return f"def {self.nombre[1]}({params}):\n   {cuerpo}"
+    
+    def generar_codigo(self):
+        codigo  = f'{self.nombre[1]}:\n'
+        codigo += "\n".join(c.generar_codigo() for c in self.cuerpo)
+        return codigo
+
 
 class NodoParametro(NodoAST):
     # Nodo que representa un parámetro de función
@@ -50,12 +69,23 @@ class NodoParametro(NodoAST):
         self.tipo = tipo
         self.nombre = nombre
 
+    def traducir(self):
+        return f"{self.nombre[1]}"
+
 
 class NodoAsignacion(NodoAST):
     # Nodo que representa una asignación de variable
     def __init__(self, nombre, expresion):
         self.nombre = nombre
         self.expresion = expresion
+
+    def traducir(self):
+        return f"{self.nombre[1]} = {self.expresion.traducir()}"
+
+    def generar_codigo(self):
+        codigo = self.expresion.generar_codigo()
+        codigo += f'\n   mov [{self.nombre[1]}], eax; Guardar resultado en {self.nombre[1]}'
+        return codigo
 
 
 class NodoOperacion(NodoAST):
@@ -97,19 +127,61 @@ class NodoOperacion(NodoAST):
 
         return NodoOperacion(izquierda, self.operador, derecha)
         
+    def traducir(self):
+        return f"{self.izquierda.traducir()} {self.operador[1]} {self.derecha.traducir()}"
         
-        
+    def generar_codigo(self):
+        codigo = []
+        codigo.append(self.izquierda.generar_codigo()) # Cargar el operando izquierdo
+        codigo.append('   push eax; guardar en la pila') # Guardar en la pila
+        codigo.append(self.derecha.generar_codigo()) # Cargar el operando derecho
+        codigo.append('   pop ebx; recuperar el primer operando') # Sacar de la pila
+        # ebx = op1 y eax = op2
+        if self.operador[1] == '+':
+            codigo.append('   add eax, ebx; eax = eax + ebx')
+        elif self.operador[1] == '-':
+            codigo.append('   sub ebx, eax; ebx = ebx - eax')
+            codigo.append('   mov eax, ebx; eax = ebx')
+        elif self.operador[1] == '*':
+            codigo.append('   imul ebx; eax = eax * ebx')
+        elif self.operador[1] == '/':
+            codigo.append('   mov edx, 0; limpiar edx')
+            codigo.append('   idiv ebx; eax = eax / ebx')
+        return '\n'.join(codigo)
+
 
 class NodoRetorno(NodoAST):
     # Nodo que representa a la sentencia return
     def __init__(self, expresion):
         self.expresion = expresion
+        
+    def traducir(self):
+        return f"return {self.expresion.traducir()}"
+
+    def generar_codigo(self):
+        return self.expresion.generar_codigo() + '\n   ret ; Retornar desde la subrutina'
 
 
 class NodoIdentificador(NodoAST):
     # Nodo que representa a un identificador
     def __init__(self, nombre):
         self.nombre = nombre
+
+    def traducir(self):
+        return self.nombre[1]
+
+    def generar_codigo(self):
+        return f'   mov eax, {self.nombre[1]} ; Cargar variable {self.nombre[1]} en eax'
+
+class NodoNumero(NodoAST):
+    def __init__(self, valor):
+        self.valor = valor
+
+    def traducir(self):
+        return str(self.valor)
+    
+    def generar_codigo(self):
+        return f'   mov eax, {self.valor} ; Cargar número {self.valor} en eax'
 
 class NodoWhile(NodoAST):
     # Nodo que representa a un ciclo while
@@ -118,11 +190,38 @@ class NodoWhile(NodoAST):
         self.cuerpo = cuerpo
 
 class NodoIf(NodoAST):
-    # Nodo que representa a una sentencia if
+    # Nodo que representa una sentencia if
     def __init__(self, condicion, cuerpo, sino=None):
         self.condicion = condicion
         self.cuerpo = cuerpo
         self.sino = sino
+
+    def generar_codigo(self):
+        etiqueta_else = f'etiqueta_else'
+        etiqueta_fin = f'etiqueta_fin'
+
+        codigo = []
+        codigo.append(self.condicion.generar_codigo())
+        codigo.append('   cmp eax, 0 ; Comparar resultado con 0')
+
+        if self.sino:
+            codigo.append(f'   je {etiqueta_else} ; Saltar a else si la condición es falsa')
+        else:
+            codigo.append(f'   je {etiqueta_fin} ; Saltar al final si la condición es falsa')
+
+        # Código del cuerpo del if
+        for instruccion in self.cuerpo:
+            codigo.append(instruccion.generar_codigo())
+
+        if self.sino:
+            codigo.append(f'   jmp {etiqueta_fin} ; Saltar al final del if')
+            codigo.append(f'{etiqueta_else}:')
+            for instruccion in self.sino:
+                codigo.append(instruccion.generar_codigo())
+
+        codigo.append(f'{etiqueta_fin}:')
+        return '\n'.join(codigo)
+    
 
 class NodoFor(NodoAST):
     # Nodo que representa a un ciclo for
@@ -142,8 +241,3 @@ class NodoTexto(NodoAST):
     def __init__(self, valor):
         self.valor = valor
     
-class NodoNumero(NodoAST):
-    # Nodo que representa un número
-    def __init__(self, valor):
-        self.valor = valor
-
