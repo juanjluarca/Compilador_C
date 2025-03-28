@@ -5,25 +5,10 @@ from analizador import *
 
 texto = """
 
-int suma (int a, int b) {
-    int c = a + b;
-    if (c > 10) {
-        return c;
-    } else {
-        return 0;
-    }
+int suma (int a, int b, int x) {
+    x = a + b;
+
 }
-
-"""
-texto2 = """
-void main() { 
-while (x < 8) {
-    x = x + 1;
-    }
-    int s = suma(3, 4);
-    print(s);
-    } 
-
 """
 
 token = tokenize(texto)
@@ -121,7 +106,6 @@ class Parser:
         self.coincidir('DELIMITER') # Final del statement ";"
         return NodoRetorno(expresion)
 
-
     def asignacion(self):
         if self.obtener_token_actual()[0] == "KEYWORD":
             tipo = self.coincidir("KEYWORD")
@@ -172,9 +156,8 @@ class Parser:
         self.coincidir('DELIMITER')  # {
         cuerpo = self.cuerpo()
         self.coincidir('DELIMITER')  # Se espera un "}"
-
         return NodoWhile(condicion, cuerpo)
-    
+
     def contenido(self):
         token = self.obtener_token_actual()
         if token[0] == "OPERATOR":
@@ -198,7 +181,7 @@ class Parser:
         self.coincidir('OPERATOR')  # "
         self.coincidir('DELIMITER')  # )
         self.coincidir('DELIMITER')  # ;
-        return NodoPrint(elementos)
+        return NodoPrint(NodoTexto(elementos))
 
     def sentencia_for(self):
         self.coincidir('KEYWORD')  # for
@@ -231,7 +214,7 @@ def imprimir_ast(nodo):
                 'Parametros': [imprimir_ast(p) for p in nodo.parametros],
                 'Cuerpo': [imprimir_ast(c) for c in nodo.cuerpo]}
     elif isinstance(nodo, NodoParametro):
-        return {'Parametro': nodo.nombre, 'Tipo': nodo.tipo}
+        return {'Tipo': nodo.tipo, 'Parametro': nodo.nombre}
     elif isinstance(nodo, NodoWhile):
         return {'While': [imprimir_ast(nodo.condicion), [imprimir_ast(c) for c in nodo.cuerpo]]}
     elif isinstance(nodo, NodoIf):
@@ -240,7 +223,7 @@ def imprimir_ast(nodo):
         return {'Asignacion': nodo.nombre,
                 'Expresion': imprimir_ast(nodo.expresion)}
     elif isinstance(nodo, NodoPrint):
-        return {'Print': nodo.expresion}
+        return {'Print': imprimir_ast(nodo.expresion)}
     elif isinstance(nodo, NodoTexto):
         return {'Texto': nodo.valor}
     elif isinstance(nodo, NodoFor):
@@ -251,8 +234,8 @@ def imprimir_ast(nodo):
                     'Cuerpo': [imprimir_ast(c) for c in nodo.cuerpo]
                 }}
     elif isinstance(nodo, NodoOperacion):
-        return {'Operacion': nodo.operador,
-                'Izquierda': imprimir_ast(nodo.izquierda),
+        return {'Izquierda': imprimir_ast(nodo.izquierda),
+                'Operacion': nodo.operador,
                 'Derecha': imprimir_ast(nodo.derecha)}
     elif isinstance(nodo, NodoRetorno):
         return {'Return': imprimir_ast(nodo.expresion)}
@@ -260,6 +243,8 @@ def imprimir_ast(nodo):
         return {'Identificador': nodo.nombre}
     elif isinstance(nodo, NodoNumero):
         return {'Numero': nodo.valor}
+    elif isinstance(nodo, NodoTexto):
+        return {'Texto': nodo.valor}
 
     return {}
 
@@ -277,7 +262,7 @@ try:
     # print(json.dumps(imprimir_ast(exp_op), indent=1))
     
     # print('Análisis sintáctico exitoso')
-    # print(json.dumps(imprimir_ast(arbol_ast), indent=1))
+    #print(json.dumps(imprimir_ast(arbol_ast), indent=1))
 
 except SyntaxError as e:
     print(e)

@@ -1,0 +1,47 @@
+# Archivos de compilación de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+.virtualenv/
+
+# Archivos de dependencias
+*.egg-info/
+*.whl
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Archivos de Windows y WSL
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.wslconfig
+.bash_history
+.bash_logout
+.bashrc
+.profile
+.cache/
+
+# Archivos de IDEs y editores
+.vscode/
+.idea/
+*.iml
+
+# Archivos de compilación y ensamblador
+*.o
+*.obj
+*.exe
+*.out
+*.dll
+*.so
+*.a
+
+# Archivos de logs y caché
+*.log
+*.cache
+logs/
+debug.log

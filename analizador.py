@@ -147,6 +147,14 @@ class NodoOperacion(NodoAST):
         elif self.operador[1] == '/':
             codigo.append('   mov edx, 0; limpiar edx')
             codigo.append('   idiv ebx; eax = eax / ebx')
+        elif self.operador[1] == '<':
+            codigo.append('   cmp eax, ebx; comparar eax y ebx')
+            codigo.append('   mov eax, 0; cargar 0 en eax')
+            codigo.append('   setl al; eax = eax < ebx')
+        elif self.operador[1] == '>':
+            codigo.append('   cmp eax, ebx; comparar eax y ebx')
+            codigo.append('   mov eax, 0; cargar 0 en eax')
+            codigo.append('   setg al; eax = eax > ebx')
         return '\n'.join(codigo)
 
 
@@ -188,6 +196,24 @@ class NodoWhile(NodoAST):
     def __init__(self, condicion, cuerpo):
         self.condicion = condicion
         self.cuerpo = cuerpo
+
+    def generar_codigo(self):
+        etiqueta_inicio = f'etiqueta_inicio'
+        etiqueta_fin = f'etiqueta_fin'
+
+        codigo = []
+        codigo.append(f'{etiqueta_inicio}:')
+        codigo.append(self.condicion.generar_codigo())
+        codigo.append('   cmp eax, 0 ; Comparar resultado con 0')
+        codigo.append(f'   je {etiqueta_fin} ; Saltar al final si la condición es falsa')
+
+        for instruccion in self.cuerpo:
+            codigo.append(instruccion.generar_codigo())
+
+        codigo.append(f'   jmp {etiqueta_inicio} ; Saltar al inicio del ciclo')
+        codigo.append(f'{etiqueta_fin}:')
+
+        return '\n'.join(codigo)
 
 class NodoIf(NodoAST):
     # Nodo que representa una sentencia if
@@ -231,13 +257,50 @@ class NodoFor(NodoAST):
         self.actualizacion = actualizacion
         self.cuerpo = cuerpo
 
+    def generar_codigo(self):
+        etiqueta_inicio = f'etiqueta_inicio'
+        etiqueta_fin = f'etiqueta_fin'
+
+        codigo = []
+        # Inicialización
+        codigo.append(self.inicializacion.generar_codigo())
+        codigo.append(f'{etiqueta_inicio}:')
+        # Condición
+        codigo.append(self.condicion.generar_codigo())
+        codigo.append('   cmp eax, 0 ; Comparar resultado con 0')
+        codigo.append(f'   je {etiqueta_fin} ; Saltar al final si la condición es falsa')
+        # Cuerpo
+        for instruccion in self.cuerpo:
+            codigo.append(instruccion.generar_codigo())
+        # Actualización
+        codigo.append(self.actualizacion.generar_codigo())
+        codigo.append(f'   jmp {etiqueta_inicio} ; Saltar al inicio del ciclo')
+        codigo.append(f'{etiqueta_fin}:')
+
+        return '\n'.join(codigo)
+
 class NodoPrint(NodoAST):
     # Nodo que representa a la función print
     def __init__(self, expresion):
         self.expresion = expresion
 
+    def generar_codigo(self):
+        codigo = []
+        codigo.append(self.expresion.generar_codigo())  # Generar código para la expresión a imprimir
+        codigo.append('   push eax; guardar en la pila')
+        codigo.append('   mov eax, 4; código de syscall para sys_write')
+        codigo.append('   mov ebx, 1; descriptor de archivo para stdout')
+        codigo.append('   pop ecx; dirección del mensaje')
+        codigo.append('   mov edx, 50; longitud del mensaje (ajustar según necesidad)')
+        codigo.append('   int 0x80; llamar al sistema')
+        return '\n'.join(codigo)
+
+
 class NodoTexto(NodoAST):
     # Nodo que representa un texto
     def __init__(self, valor):
         self.valor = valor
+
+    def generar_codigo(self):
+        return f'   mov eax, {self.valor} ; Cargar texto {self.valor} en eax'
     
