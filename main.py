@@ -1,18 +1,36 @@
 import json
-
+import subprocess
 from analizador import *
 
 
 texto = """
 
-int suma (int a, int b, int x) {
-    x = a + b;
+int funcion(int a, int b, int c) {
+    a = 9;
+    b = 7;
+    c = a * b;
+    print(c);
+
+    if (a > c) {
+        print(a);
+    } else {
+        print(b);
+    }
+
+    while (b < 11) {
+        b = b + 1;
+    }
+    print(b);
+    for (int i = 0; i < 10; i = i + 2) {
+        print(i);
+    }
+    return 0;
 
 }
+
 """
 
 token = tokenize(texto)
-
 
 # Analizador sintáctico
 class Parser:
@@ -43,8 +61,8 @@ class Parser:
             if funcion.nombre[1] == 'main':
                 hay_main = True
             funciones.append(funcion)
-        # if not hay_main:
-        #     raise SyntaxError('Error sintáctico: se requiere una función main')
+        #if not hay_main:
+        #    raise SyntaxError('Error sintáctico: se requiere una función main')
         return NodoPrograma(funciones) #
 
     # Función para reconocer declaraciones de variables dentro del cuerpo de la función y evaluar operaciones aritméticas más complejas:
@@ -52,7 +70,6 @@ class Parser:
         # Gramática para una función: int IDENTIFICADOR (int IDENTIFICADOR*) {cuerpo}
         tipo_retorno = self.coincidir('KEYWORD')  # Tipo de retorno (ej. int)
         nombre_funcion = self.coincidir('IDENTIFIER')  # Nombre de la función
-        print(nombre_funcion)
         if nombre_funcion[1] == 'main':
             self.coincidir('DELIMITER') # Se espera un "("
             self.coincidir('DELIMITER') # Se espera un ")"
@@ -105,7 +122,7 @@ class Parser:
         expresion = self.expresion()
         self.coincidir('DELIMITER') # Final del statement ";"
         return NodoRetorno(expresion)
-
+    
     def asignacion(self):
         if self.obtener_token_actual()[0] == "KEYWORD":
             tipo = self.coincidir("KEYWORD")
@@ -147,6 +164,8 @@ class Parser:
             self.coincidir('DELIMITER') # }
             return NodoIf(condicion, cuerpo, sino)
         return NodoIf(condicion, cuerpo)
+    
+
 
     def sentencia_while(self):
         self.coincidir('KEYWORD')  # while
@@ -173,38 +192,44 @@ class Parser:
     def sentencia_print(self):
         self.coincidir('KEYWORD')  # print
         self.coincidir('DELIMITER')  # (
-        texto = []
-        self.coincidir('OPERATOR')  # "
-        while self.obtener_token_actual() and self.obtener_token_actual()[1] != '"':
-            texto.append(self.contenido())
-        elementos = " ".join(texto)
-        self.coincidir('OPERATOR')  # "
+        variable = self.coincidir('IDENTIFIER')
         self.coincidir('DELIMITER')  # )
         self.coincidir('DELIMITER')  # ;
-        return NodoPrint(NodoTexto(elementos))
+        return NodoPrint(NodoIdentificador(variable))  # Aquí se guarda la variable en el nodo print
 
     def sentencia_for(self):
         self.coincidir('KEYWORD')  # for
         self.coincidir('DELIMITER')  # (
-        # Inicialización (ej: int i = 0)
-        self.coincidir('KEYWORD')  # int
-        identificador = self.coincidir('IDENTIFIER')  # Nombre de la variable
-        self.coincidir('OPERATOR')  # Asignación (=)
-        inicializacion = self.termino()  # Número o identificador
+        
+        # Inicialización (ej: i = 0)
+        if self.obtener_token_actual()[0] == "KEYWORD":
+            self.coincidir("KEYWORD")  # tipo (int, etc.)
+        identificador = self.coincidir('IDENTIFIER')
+        self.coincidir('OPERATOR')  # =
+        valor_inicial = self.expresion()
         self.coincidir('DELIMITER')  # ;
-        # Condición (ej: i < 8)
+        
+        inicializacion = NodoAsignacion(identificador, valor_inicial)
+        
+        # Condición (ej: i < 10)
         condicion = self.expresion()
         self.coincidir('DELIMITER')  # ;
+        
         # Actualización (ej: i = i + 1)
-        variable_actualizacion = self.coincidir('IDENTIFIER')  # Variable de control
-        self.coincidir('OPERATOR')  # Operador de asignación (=)
-        actualizacion = self.expresion()
+        var_actualizacion = self.coincidir('IDENTIFIER')
+        self.coincidir('OPERATOR')  # =
+        expr_actualizacion = self.expresion()
         self.coincidir('DELIMITER')  # )
+        
+        actualizacion = NodoAsignacion(var_actualizacion, expr_actualizacion)
+        
+        # Cuerpo del for
         self.coincidir('DELIMITER')  # {
         cuerpo = self.cuerpo()
         self.coincidir('DELIMITER')  # }
+        
+        return NodoFor(inicializacion, condicion, actualizacion, cuerpo)
 
-        return NodoFor((identificador, inicializacion), condicion, (variable_actualizacion, actualizacion), cuerpo)
 
 def imprimir_ast(nodo):
     if isinstance(nodo, NodoPrograma):
@@ -224,15 +249,21 @@ def imprimir_ast(nodo):
                 'Expresion': imprimir_ast(nodo.expresion)}
     elif isinstance(nodo, NodoPrint):
         return {'Print': imprimir_ast(nodo.expresion)}
-    elif isinstance(nodo, NodoTexto):
-        return {'Texto': nodo.valor}
     elif isinstance(nodo, NodoFor):
-        return {'For': {
-                    'Inicializacion': f"{nodo.inicializacion[0]} {imprimir_ast(nodo.inicializacion[1])}",
-                    'Condicion': imprimir_ast(nodo.condicion),
-                    'Actualizacion': f"{nodo.actualizacion[0]} {imprimir_ast(nodo.actualizacion[1])}",
-                    'Cuerpo': [imprimir_ast(c) for c in nodo.cuerpo]
-                }}
+        return {
+            'For': {
+                'Inicializacion': {
+                    'Variable': nodo.inicializacion.nombre[1],
+                    'Valor': imprimir_ast(nodo.inicializacion.expresion)
+                },
+                'Condicion': imprimir_ast(nodo.condicion),
+                'Actualizacion': {
+                    'Variable': nodo.actualizacion.nombre[1],
+                    'Expresion': imprimir_ast(nodo.actualizacion.expresion)
+                },
+                'Cuerpo': [imprimir_ast(c) for c in nodo.cuerpo]
+            }
+        }
     elif isinstance(nodo, NodoOperacion):
         return {'Izquierda': imprimir_ast(nodo.izquierda),
                 'Operacion': nodo.operador,
@@ -243,26 +274,23 @@ def imprimir_ast(nodo):
         return {'Identificador': nodo.nombre}
     elif isinstance(nodo, NodoNumero):
         return {'Numero': nodo.valor}
-    elif isinstance(nodo, NodoTexto):
-        return {'Texto': nodo.valor}
 
     return {}
 
 #  Aquí se prueba
 try:
-    print('Se inicia el análisis sintáctico')
     parser = Parser(token)
     arbol_ast = parser.parsear()
     codigo_asm = arbol_ast.generar_codigo()
-    print(codigo_asm)
-    
-    # nodo_exp = NodoOperacion(NodoNumero(2), '+', NodoNumero(0))
-    # print(json.dumps(imprimir_ast(nodo_exp), indent=1))
-    # exp_op = nodo_exp.optimizar()
-    # print(json.dumps(imprimir_ast(exp_op), indent=1))
-    
+    with open("programa.asm", "w") as archivo:
+        archivo.write(codigo_asm)
+
+    subprocess.run(["nasm", "-f", "elf32", "programa.asm", "-o", "programa.o"])
+    subprocess.run(["ld", "-m", "elf_i386", "-o", "programa", "programa.o"])
+    subprocess.run(["./programa"])
+
     # print('Análisis sintáctico exitoso')
-    #print(json.dumps(imprimir_ast(arbol_ast), indent=1))
+    # print(json.dumps(imprimir_ast(arbol_ast), indent=1))
 
 except SyntaxError as e:
     print(e)

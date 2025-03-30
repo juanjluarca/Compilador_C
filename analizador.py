@@ -3,6 +3,7 @@ import re
 # Op relacional = <, >, =, !, <=, >=, ==, !=,
 # Op lógicos = &, &&, |, ||, !
 # Definir patrones de tokens
+
 token_patron = {
     "KEYWORD": r'\b(if|else|while|for|return|int|float|void|class|def|print)\b',
     "IDENTIFIER": r'\b[a-zA-Z_][a-zA-Z0-9_]*\b',
@@ -34,16 +35,105 @@ class NodoAST:
     def generar_codigo(self):
         raise NotImplementedError("Método generar_codigo no implementado en este nodo")
 
+
 class NodoPrograma(NodoAST):
-    # Nodo que representa el programa como un conjunto de funciones
     def __init__(self, funciones):
         self.funciones = funciones
+        self.variables = set()  # Conjunto para almacenar variables
 
+    def recolectar_variables(self, nodo):
+        # Recorre el AST y extrae los nombres de las variables.
+        if isinstance(nodo, NodoAsignacion):
+            self.variables.add(nodo.nombre[1])  # Guardar la variable
+        elif isinstance(nodo, NodoIdentificador):
+            self.variables.add(nodo.nombre[1])
+        elif isinstance(nodo, NodoFuncion):
+            for instruccion in nodo.cuerpo:
+                self.recolectar_variables(instruccion)
+        elif isinstance(nodo, NodoOperacion):
+            self.recolectar_variables(nodo.izquierda)
+            self.recolectar_variables(nodo.derecha)
+        elif isinstance(nodo, NodoIf) or isinstance(nodo, NodoWhile) or isinstance(nodo, NodoFor):
+            self.recolectar_variables(nodo.condicion)
+            for instruccion in nodo.cuerpo:
+                self.recolectar_variables(instruccion)
+            if hasattr(nodo, 'sino') and nodo.sino:
+                for instruccion in nodo.sino:
+                    self.recolectar_variables(instruccion)
+
+    def generar_codigo(self):
+        # Genera el código ensamblador incluyendo las variables en .data automáticamente
+        self.variables = set()  # Resetear variables
+        for funcion in self.funciones:
+            self.recolectar_variables(funcion)
+
+        codigo = []
+
+        # Sección de datos (incluye variables detectadas)
+        codigo.append("section .data")
+        for var in self.variables:
+            codigo.append(f"   {var} dd 0")  # entero de 32 bits
+        # Agregar variable salto de línea
+        codigo.append("   newline db 0xA")  # Salto de línea
+        codigo.append("section .bss")
+        codigo.append("   char resb 16") # Reservar espacio para un carácter
+
+        # Sección de código
+        codigo.append("section .text")
+        codigo.append("   global _start")
+        codigo.append("_start:")
+        
+        # Agregar llamada a cada función desde _start
+        for funcion in self.funciones:
+            codigo.append(f"   call {funcion.nombre[1]}")  # Llamar a la función
+                # Finalizar ejecución
+        
+        codigo.append("   mov eax, 1")  # syscall exit
+        codigo.append("   xor ebx, ebx")
+        codigo.append("   int 0x80")
+
+        for funcion in self.funciones:
+            codigo.append(funcion.generar_codigo())
+        # Función para imprimir un numero
+        codigo.append("imprimir:")
+        codigo.extend([
+                # Convertir número a string (maneja múltiples dígitos)
+                "   mov ecx, 10",         # Divisor para conversión
+                "   mov edi, char+11",
+                "   mov byte [edi], 0",   # Null terminator
+                "   dec edi",
+                "   mov byte [edi], 0xA", # Newline
+                "   dec edi",
+                "   mov esi, 2",          # Contador de caracteres (newline + null)",
+                
+                "convert_loop:",
+                "   xor edx, edx",       # Limpiar edx para división
+                "   div ecx",             # eax = eax/10, edx = resto
+                "   add dl, '0'",         # Convertir a ASCII
+                "   mov [edi], dl",       # Almacenar dígito
+                "   dec edi",
+                "   inc esi",
+                "   test eax, eax",       # Verificar si eax es cero
+                "   jnz convert_loop",
+                
+                # Ajustar puntero al inicio del número
+                "   inc edi",
+                
+                # Imprimir el número con newline
+                "   mov eax, 4",          # sys_write
+                "   mov ebx, 1",          # stdout
+                "   mov ecx, edi",        # Puntero al string
+                "   mov edx, esi",        # Longitud (dígitos + newline)
+                "   int 0x80",
+                "   ret"  # Retornar de la función imprimir
+            ])
+       
+
+        return "\n".join(codigo)
+    
     def traducir(self):
         return "\n\n".join(f.traducir() for f in self.funciones)
 
-    def generar_codigo(self):
-        return "\n\n".join(f.generar_codigo() for f in self.funciones)
 
 class NodoFuncion(NodoAST):
     # Nodo que representa una función
@@ -58,7 +148,11 @@ class NodoFuncion(NodoAST):
         return f"def {self.nombre[1]}({params}):\n   {cuerpo}"
     
     def generar_codigo(self):
-        codigo  = f'{self.nombre[1]}:\n'
+        if self.nombre[1] == 'main':
+            codigo = f'_start:\n'
+        else:
+            codigo  = f'{self.nombre[1]}:\n'
+            
         codigo += "\n".join(c.generar_codigo() for c in self.cuerpo)
         return codigo
 
@@ -157,7 +251,6 @@ class NodoOperacion(NodoAST):
             codigo.append('   setg al; eax = eax > ebx')
         return '\n'.join(codigo)
 
-
 class NodoRetorno(NodoAST):
     # Nodo que representa a la sentencia return
     def __init__(self, expresion):
@@ -169,7 +262,6 @@ class NodoRetorno(NodoAST):
     def generar_codigo(self):
         return self.expresion.generar_codigo() + '\n   ret ; Retornar desde la subrutina'
 
-
 class NodoIdentificador(NodoAST):
     # Nodo que representa a un identificador
     def __init__(self, nombre):
@@ -179,7 +271,7 @@ class NodoIdentificador(NodoAST):
         return self.nombre[1]
 
     def generar_codigo(self):
-        return f'   mov eax, {self.nombre[1]} ; Cargar variable {self.nombre[1]} en eax'
+        return f'   mov eax, [{self.nombre[1]}] ; Cargar variable {self.nombre[1]} en eax'
 
 class NodoNumero(NodoAST):
     def __init__(self, valor):
@@ -199,13 +291,13 @@ class NodoWhile(NodoAST):
 
     def generar_codigo(self):
         etiqueta_inicio = f'etiqueta_inicio'
-        etiqueta_fin = f'etiqueta_fin'
+        etiqueta_fin = f'etiqueta_fin_while'
 
         codigo = []
         codigo.append(f'{etiqueta_inicio}:')
         codigo.append(self.condicion.generar_codigo())
         codigo.append('   cmp eax, 0 ; Comparar resultado con 0')
-        codigo.append(f'   je {etiqueta_fin} ; Saltar al final si la condición es falsa')
+        codigo.append(f'   jne {etiqueta_fin} ; Saltar al final si la condición es falsa')
 
         for instruccion in self.cuerpo:
             codigo.append(instruccion.generar_codigo())
@@ -224,14 +316,14 @@ class NodoIf(NodoAST):
 
     def generar_codigo(self):
         etiqueta_else = f'etiqueta_else'
-        etiqueta_fin = f'etiqueta_fin'
+        etiqueta_fin = f'etiqueta_fin_if'
 
         codigo = []
         codigo.append(self.condicion.generar_codigo())
         codigo.append('   cmp eax, 0 ; Comparar resultado con 0')
 
         if self.sino:
-            codigo.append(f'   je {etiqueta_else} ; Saltar a else si la condición es falsa')
+            codigo.append(f'   jne {etiqueta_else} ; Saltar a else si la condición es falsa')
         else:
             codigo.append(f'   je {etiqueta_fin} ; Saltar al final si la condición es falsa')
 
@@ -250,57 +342,52 @@ class NodoIf(NodoAST):
     
 
 class NodoFor(NodoAST):
-    # Nodo que representa a un ciclo for
     def __init__(self, inicializacion, condicion, actualizacion, cuerpo):
-        self.inicializacion = inicializacion
-        self.condicion = condicion
-        self.actualizacion = actualizacion
+        self.inicializacion = inicializacion  # Debe ser una NodoAsignacion
+        self.condicion = condicion            # Expresión booleana
+        self.actualizacion = actualizacion    # Debe ser una NodoAsignacion
         self.cuerpo = cuerpo
 
     def generar_codigo(self):
-        etiqueta_inicio = f'etiqueta_inicio'
-        etiqueta_fin = f'etiqueta_fin'
-
+        etiqueta_inicio = "for_inicio"
+        etiqueta_fin = "for_fin"
+        
         codigo = []
         # Inicialización
         codigo.append(self.inicializacion.generar_codigo())
-        codigo.append(f'{etiqueta_inicio}:')
+        
+        # Etiqueta de inicio del bucle
+        codigo.append(f"{etiqueta_inicio}:")
+        
         # Condición
         codigo.append(self.condicion.generar_codigo())
-        codigo.append('   cmp eax, 0 ; Comparar resultado con 0')
-        codigo.append(f'   je {etiqueta_fin} ; Saltar al final si la condición es falsa')
-        # Cuerpo
+        codigo.append("   cmp eax, 0")
+        codigo.append(f"   jne {etiqueta_fin}")
+        
+        # Cuerpo del for, ejecuta todas las instrucciones dentro del for
         for instruccion in self.cuerpo:
             codigo.append(instruccion.generar_codigo())
-        # Actualización
+        
+        # Actualización, ejecuta la instrucción de actualización
         codigo.append(self.actualizacion.generar_codigo())
-        codigo.append(f'   jmp {etiqueta_inicio} ; Saltar al inicio del ciclo')
-        codigo.append(f'{etiqueta_fin}:')
-
-        return '\n'.join(codigo)
-
+        
+        # Salto al inicio del for
+        codigo.append(f"   jmp {etiqueta_inicio}")
+        
+        # Etiqueta de fin
+        codigo.append(f"{etiqueta_fin}:")
+        
+        return "\n".join(codigo)
+    
+    
 class NodoPrint(NodoAST):
     # Nodo que representa a la función print
-    def __init__(self, expresion):
-        self.expresion = expresion
+    def __init__(self, variable):
+        self.variable = variable
 
     def generar_codigo(self):
-        codigo = []
-        codigo.append(self.expresion.generar_codigo())  # Generar código para la expresión a imprimir
-        codigo.append('   push eax; guardar en la pila')
-        codigo.append('   mov eax, 4; código de syscall para sys_write')
-        codigo.append('   mov ebx, 1; descriptor de archivo para stdout')
-        codigo.append('   pop ecx; dirección del mensaje')
-        codigo.append('   mov edx, 50; longitud del mensaje (ajustar según necesidad)')
-        codigo.append('   int 0x80; llamar al sistema')
-        return '\n'.join(codigo)
-
-
-class NodoTexto(NodoAST):
-    # Nodo que representa un texto
-    def __init__(self, valor):
-        self.valor = valor
-
-    def generar_codigo(self):
-        return f'   mov eax, {self.valor} ; Cargar texto {self.valor} en eax'
-    
+            codigo = [
+                self.variable.generar_codigo(),  # Obtener valor en eax",
+                "   call imprimir"
+            ]
+            return "\n".join(codigo)
