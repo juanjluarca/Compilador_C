@@ -4,11 +4,7 @@ from analizador import *
 
 
 texto = """
-
 int funcion(int a, int b, int c) {
-    a = 9;
-    b = 7;
-    c = a * b;
     print(c);
 
     if (a > c) {
@@ -25,7 +21,15 @@ int funcion(int a, int b, int c) {
         print(i);
     }
     return 0;
+}
 
+int main() {
+    int x = 8;
+    int y = 5;
+    int z = x + y;
+    print(z);
+    funcion(x, y, z);
+    return 0;
 }
 
 """
@@ -61,8 +65,8 @@ class Parser:
             if funcion.nombre[1] == 'main':
                 hay_main = True
             funciones.append(funcion)
-        #if not hay_main:
-        #    raise SyntaxError('Error sintáctico: se requiere una función main')
+        if not hay_main:
+            raise SyntaxError('Error sintáctico: se requiere una función main')
         return NodoPrograma(funciones) #
 
     # Función para reconocer declaraciones de variables dentro del cuerpo de la función y evaluar operaciones aritméticas más complejas:
@@ -70,13 +74,13 @@ class Parser:
         # Gramática para una función: int IDENTIFICADOR (int IDENTIFICADOR*) {cuerpo}
         tipo_retorno = self.coincidir('KEYWORD')  # Tipo de retorno (ej. int)
         nombre_funcion = self.coincidir('IDENTIFIER')  # Nombre de la función
+        self.coincidir('DELIMITER') # Se espera un "("
+
         if nombre_funcion[1] == 'main':
-            self.coincidir('DELIMITER') # Se espera un "("
             self.coincidir('DELIMITER') # Se espera un ")"
             self.coincidir('DELIMITER') # Se espera un "{"
             parametros = []
         else:
-            self.coincidir('DELIMITER')  # Se espera un "("
             parametros = self.parametros()
             self.coincidir('DELIMITER')  # Se espera un ")"
             self.coincidir('DELIMITER')  # Se espera un "{"
@@ -113,9 +117,25 @@ class Parser:
                 instrucciones.append(self.sentencia_if())
             elif self.obtener_token_actual()[1] == 'print':
                 instrucciones.append(self.sentencia_print())
+            elif (self.obtener_token_actual()[0] == 'IDENTIFIER' and 
+                self.pos + 1 < len(self.tokens) and 
+                self.tokens[self.pos + 1][1] == '('):
+                instrucciones.append(self.llamada_funcion())
             else:
                 instrucciones.append(self.asignacion())
         return instrucciones
+
+    def llamada_funcion(self):
+        nombre = self.coincidir('IDENTIFIER')
+        self.coincidir('DELIMITER')  # (
+        argumentos = []
+        while self.obtener_token_actual() and self.obtener_token_actual()[1] != ')':
+            argumentos.append(self.expresion())
+            if self.obtener_token_actual() and self.obtener_token_actual()[1] == ',':
+                self.coincidir('DELIMITER')
+        self.coincidir('DELIMITER')  # )
+        self.coincidir('DELIMITER')  # ;
+        return NodoLlamadaFuncion(nombre, argumentos)
 
     def retorno(self):
         self.coincidir('KEYWORD') # return

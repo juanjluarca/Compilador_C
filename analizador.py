@@ -81,19 +81,18 @@ class NodoPrograma(NodoAST):
         # Sección de código
         codigo.append("section .text")
         codigo.append("   global _start")
-        codigo.append("_start:")
         
-        # Agregar llamada a cada función desde _start
         for funcion in self.funciones:
-            codigo.append(f"   call {funcion.nombre[1]}")  # Llamar a la función
-                # Finalizar ejecución
-        
-        codigo.append("   mov eax, 1")  # syscall exit
-        codigo.append("   xor ebx, ebx")
-        codigo.append("   int 0x80")
-
-        for funcion in self.funciones:
-            codigo.append(funcion.generar_codigo())
+            if funcion.nombre[1] == 'main':
+                # Convertimos main en _start
+                codigo.append("_start:")
+                for instruccion in funcion.cuerpo:
+                    codigo.append(instruccion.generar_codigo())
+                codigo.append("   mov eax, 1")  # sys_exit
+                codigo.append("   xor ebx, ebx")
+                codigo.append("   int 0x80")
+            else:
+                codigo.append(funcion.generar_codigo())    
         # Función para imprimir un numero
         codigo.append("imprimir:")
         codigo.extend([
@@ -148,14 +147,21 @@ class NodoFuncion(NodoAST):
         return f"def {self.nombre[1]}({params}):\n   {cuerpo}"
     
     def generar_codigo(self):
-        if self.nombre[1] == 'main':
-            codigo = f'_start:\n'
-        else:
-            codigo  = f'{self.nombre[1]}:\n'
-            
-        codigo += "\n".join(c.generar_codigo() for c in self.cuerpo)
-        return codigo
-
+        codigo = []
+        if self.nombre[1] != 'main':  # Solo generar etiqueta si no es main
+            codigo.append(f'{self.nombre[1]}:')
+            for i, param in enumerate(self.parametros):
+                codigo.append(f'   mov eax, [esp+{4*(i+1)}]')
+                codigo.append(f'   mov [{param.nombre[1]}], eax')
+        
+        # Generar código para el cuerpo
+        for instruccion in self.cuerpo:
+            codigo.append(instruccion.generar_codigo())
+        
+        if self.nombre[1] != 'main':
+            codigo.append('   ret')
+        
+        return '\n'.join(codigo)
 
 class NodoParametro(NodoAST):
     # Nodo que representa un parámetro de función
@@ -391,3 +397,23 @@ class NodoPrint(NodoAST):
                 "   call imprimir"
             ]
             return "\n".join(codigo)
+
+class NodoLlamadaFuncion(NodoAST):
+    def __init__(self, nombre, argumentos):
+        self.nombre = nombre
+        self.argumentos = argumentos
+
+    def generar_codigo(self):
+        codigo = []
+        # Empujar argumentos en orden inverso
+        for arg in reversed(self.argumentos):
+            codigo.append(arg.generar_codigo())
+            codigo.append("   push eax")
+        
+        codigo.append(f"   call {self.nombre[1]}")
+        
+        # Limpiar la pila (4 bytes por argumento)
+        if self.argumentos:
+            codigo.append(f"   add esp, {4*len(self.argumentos)}")
+        
+        return "\n".join(codigo)

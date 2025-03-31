@@ -1,29 +1,23 @@
 section .data
-   a dd 0
-   c dd 0
-   b dd 0
+   x dd 0
+   z dd 0
    i dd 0
+   y dd 0
+   a dd 0
+   b dd 0
+   c dd 0
    newline db 0xA
 section .bss
    char resb 16
 section .text
    global _start
-_start:
-   call funcion
-   mov eax, 1
-   xor ebx, ebx
-   int 0x80
 funcion:
-   mov eax, 9 ; Cargar número 9 en eax
-   mov [a], eax; Guardar resultado en a
-   mov eax, 7 ; Cargar número 7 en eax
-   mov [b], eax; Guardar resultado en b
-   mov eax, [a] ; Cargar variable a en eax
-   push eax; guardar en la pila
-   mov eax, [b] ; Cargar variable b en eax
-   pop ebx; recuperar el primer operando
-   imul ebx; eax = eax * ebx
-   mov [c], eax; Guardar resultado en c
+   mov eax, [esp+4]
+   mov [a], eax
+   mov eax, [esp+8]
+   mov [b], eax
+   mov eax, [esp+12]
+   mov [c], eax
    mov eax, [c] ; Cargar variable c en eax
    call imprimir
    mov eax, [a] ; Cargar variable a en eax
@@ -86,6 +80,33 @@ for_inicio:
 for_fin:
    mov eax, 0 ; Cargar número 0 en eax
    ret ; Retornar desde la subrutina
+   ret
+_start:
+   mov eax, 8 ; Cargar número 8 en eax
+   mov [x], eax; Guardar resultado en x
+   mov eax, 5 ; Cargar número 5 en eax
+   mov [y], eax; Guardar resultado en y
+   mov eax, [x] ; Cargar variable x en eax
+   push eax; guardar en la pila
+   mov eax, [y] ; Cargar variable y en eax
+   pop ebx; recuperar el primer operando
+   add eax, ebx; eax = eax + ebx
+   mov [z], eax; Guardar resultado en z
+   mov eax, [z] ; Cargar variable z en eax
+   call imprimir
+   mov eax, [z] ; Cargar variable z en eax
+   push eax
+   mov eax, [y] ; Cargar variable y en eax
+   push eax
+   mov eax, [x] ; Cargar variable x en eax
+   push eax
+   call funcion
+   add esp, 12
+   mov eax, 0 ; Cargar número 0 en eax
+   ret ; Retornar desde la subrutina
+   mov eax, 1
+   xor ebx, ebx
+   int 0x80
 imprimir:
    mov ecx, 10
    mov edi, char+11
