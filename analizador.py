@@ -39,6 +39,7 @@ class NodoAST:
 class NodoPrograma(NodoAST):
     def __init__(self, funciones):
         self.funciones = funciones
+        self.main = None
         self.variables = set()  # Conjunto para almacenar variables
 
     def recolectar_variables(self, nodo):
@@ -48,6 +49,10 @@ class NodoPrograma(NodoAST):
         elif isinstance(nodo, NodoIdentificador):
             self.variables.add(nodo.nombre[1])
         elif isinstance(nodo, NodoFuncion):
+            # Recolectar variables de los parámetros
+            for param in nodo.parametros:
+                self.variables.add(param.nombre[1])
+            # Recolectar variables del cuerpo de la función
             for instruccion in nodo.cuerpo:
                 self.recolectar_variables(instruccion)
         elif isinstance(nodo, NodoOperacion):
@@ -68,6 +73,9 @@ class NodoPrograma(NodoAST):
             self.recolectar_variables(funcion)
 
         codigo = []
+        # Para agregar las funciones de imprimir = %include 'funciones.asm'
+        codigo.append(f"%include 'funciones.asm'")
+
 
         # Sección de datos (incluye variables detectadas)
         codigo.append("section .data")
@@ -94,39 +102,7 @@ class NodoPrograma(NodoAST):
             else:
                 codigo.append(funcion.generar_codigo())    
         # Función para imprimir un numero
-        codigo.append("imprimir:")
-        codigo.extend([
-                # Convertir número a string (maneja múltiples dígitos)
-                "   mov ecx, 10",         # Divisor para conversión
-                "   mov edi, char+11",
-                "   mov byte [edi], 0",   # Null terminator
-                "   dec edi",
-                "   mov byte [edi], 0xA", # Newline
-                "   dec edi",
-                "   mov esi, 2",          # Contador de caracteres (newline + null)",
-                
-                "convert_loop:",
-                "   xor edx, edx",       # Limpiar edx para división
-                "   div ecx",             # eax = eax/10, edx = resto
-                "   add dl, '0'",         # Convertir a ASCII
-                "   mov [edi], dl",       # Almacenar dígito
-                "   dec edi",
-                "   inc esi",
-                "   test eax, eax",       # Verificar si eax es cero
-                "   jnz convert_loop",
-                
-                # Ajustar puntero al inicio del número
-                "   inc edi",
-                
-                # Imprimir el número con newline
-                "   mov eax, 4",          # sys_write
-                "   mov ebx, 1",          # stdout
-                "   mov ecx, edi",        # Puntero al string
-                "   mov edx, esi",        # Longitud (dígitos + newline)
-                "   int 0x80",
-                "   ret"  # Retornar de la función imprimir
-            ])
-       
+        
 
         return "\n".join(codigo)
     
@@ -136,10 +112,12 @@ class NodoPrograma(NodoAST):
 
 class NodoFuncion(NodoAST):
     # Nodo que representa una función
-    def __init__(self, nombre, parametros, cuerpo):
+    def __init__(self, nombre, parametros, cuerpo, tipo_retorno):
         self.nombre = nombre
         self.parametros = parametros
         self.cuerpo = cuerpo
+        self.tipo_retorno = tipo_retorno
+
 
     def traducir(self):
         params = ", ".join(p.traducir() for p in self.parametros)
@@ -151,7 +129,7 @@ class NodoFuncion(NodoAST):
         if self.nombre[1] != 'main':  # Solo generar etiqueta si no es main
             codigo.append(f'{self.nombre[1]}:')
             for i, param in enumerate(self.parametros):
-                codigo.append(f'   mov eax, [esp+{4*(i+1)}]')
+                codigo.append(f'   mov eax, [esp + {4*(i+1)}]')
                 codigo.append(f'   mov [{param.nombre[1]}], eax')
         
         # Generar código para el cuerpo
@@ -394,7 +372,7 @@ class NodoPrint(NodoAST):
     def generar_codigo(self):
             codigo = [
                 self.variable.generar_codigo(),  # Obtener valor en eax",
-                "   call imprimir"
+                "   call printnum",  # Llamar a la función de impresión
             ]
             return "\n".join(codigo)
 
@@ -417,3 +395,4 @@ class NodoLlamadaFuncion(NodoAST):
             codigo.append(f"   add esp, {4*len(self.argumentos)}")
         
         return "\n".join(codigo)
+    

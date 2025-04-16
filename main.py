@@ -1,37 +1,23 @@
 import json
 import subprocess
 from analizador import *
+from analisis_semantico import AnalizadorSemantico
 
+texto = """ 
 
-texto = """
 int funcion(int a, int b, int c) {
+    c = a + b;
     print(c);
-
-    if (a > c) {
-        print(a);
-    } else {
-        print(b);
-    }
-
-    while (b < 11) {
-        b = b + 1;
-    }
-    print(b);
-    for (int i = 0; i < 10; i = i + 2) {
-        print(i);
-    }
-    return 0;
+    return c;
 }
 
 int main() {
     int x = 8;
     int y = 5;
-    int z = x + y;
-    print(z);
+    int z = 0;
     funcion(x, y, z);
-    return 0;
+    return z;
 }
-
 """
 
 token = tokenize(texto)
@@ -86,7 +72,7 @@ class Parser:
             self.coincidir('DELIMITER')  # Se espera un "{"
         cuerpo = self.cuerpo()
         self.coincidir('DELIMITER')  # Se espera un "}"
-        return NodoFuncion(nombre_funcion, parametros, cuerpo)
+        return NodoFuncion(nombre_funcion, parametros, cuerpo, tipo_retorno)
 
     def parametros(self):
         parametros = []
@@ -208,7 +194,7 @@ class Parser:
         else:
             return ""
 
-    # print("a es igual a 8");
+    # print(x);
     def sentencia_print(self):
         self.coincidir('KEYWORD')  # print
         self.coincidir('DELIMITER')  # (
@@ -268,7 +254,7 @@ def imprimir_ast(nodo):
         return {'Asignacion': nodo.nombre,
                 'Expresion': imprimir_ast(nodo.expresion)}
     elif isinstance(nodo, NodoPrint):
-        return {'Print': imprimir_ast(nodo.expresion)}
+        return {'Print': imprimir_ast(nodo.variable)}
     elif isinstance(nodo, NodoFor):
         return {
             'For': {
@@ -294,13 +280,33 @@ def imprimir_ast(nodo):
         return {'Identificador': nodo.nombre}
     elif isinstance(nodo, NodoNumero):
         return {'Numero': nodo.valor}
+    elif isinstance(nodo, NodoLlamadaFuncion):
+        return {'LlamadaFuncion': nodo.nombre,
+                'Argumentos': [imprimir_ast(arg) for arg in nodo.argumentos]}
 
     return {}
 
 #  Aquí se prueba
 try:
+    print("Iniciando análisis sintáctico...")
     parser = Parser(token)
     arbol_ast = parser.parsear()
+    analizador_semantico = AnalizadorSemantico()
+    
+    
+    analisis = analizador_semantico.analizar(arbol_ast)
+
+    print("Variables")
+    for llave in (analizador_semantico.tabla_simbolos.variables.keys()):
+        valor = analizador_semantico.tabla_simbolos.variables.get(llave)
+        print(f"{llave}:{valor}")
+
+    print("\nFunciones")
+    for llave in (analizador_semantico.tabla_simbolos.funciones.keys()):
+        valor = analizador_semantico.tabla_simbolos.funciones.get(llave)
+        print(f"{llave}:{valor}")
+
+    
     codigo_asm = arbol_ast.generar_codigo()
     with open("programa.asm", "w") as archivo:
         archivo.write(codigo_asm)
