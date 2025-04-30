@@ -1,11 +1,11 @@
 %include 'funciones.asm'
 section .data
-   y dd 0
-   x dd 0
-   a dd 0
-   b dd 0
    z dd 0
+   x dd 0
+   y dd 0
    c dd 0
+   b dd 0
+   a dd 0
    newline db 0xA
 section .bss
    char resb 16
@@ -46,6 +46,4 @@ _start:
    add esp, 12
    mov eax, [z] ; Cargar variable z en eax
    ret ; Retornar desde la subrutina
-   mov eax, 1
-   xor ebx, ebx
-   int 0x80
+   call quit

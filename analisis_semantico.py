@@ -51,7 +51,7 @@ class AnalizadorSemantico:
             tipo_izq = self.analizar(nodo.izquierda)
             tipo_der = self.analizar(nodo.derecha)
             if tipo_izq != tipo_der:
-                raise Exception(f"Error: Tipos incompatibles {tipo_izq} {nodo.operador} {tipo_der}")
+                raise Exception(f"Error: Tipos incompatibles {tipo_izq} {nodo.operador[1]} {tipo_der}")
             return tipo_izq
         elif isinstance(nodo, NodoFuncion):
             # Registrar la función en la tabla de símbolos
@@ -74,8 +74,9 @@ class AnalizadorSemantico:
                 self.analizar(funcion)
         elif isinstance(nodo, NodoRetorno):
             tipo_expr = self.analizar(nodo.expresion)
-            # Aquí deberías comparar con el tipo de retorno de la función actual
-            raise NotImplementedError("Análisis de retorno no implementado completamente")
+            # raise NotImplementedError("Análisis de retorno no implementado completamente")
+
+            
     #     metodo = f'visitar_{type(nodo).__name__}'
     #     if hasattr(self, metodo):
     #         method = getattr(self, metodo)(nodo)

@@ -1,11 +1,12 @@
 import re
+from analisis_semantico import AnalizadorSemantico, TablaSimbolos
 
 # Op relacional = <, >, =, !, <=, >=, ==, !=,
 # Op lógicos = &, &&, |, ||, !
 # Definir patrones de tokens
 
 token_patron = {
-    "KEYWORD": r'\b(if|else|while|for|return|int|float|void|class|def|print)\b',
+    "KEYWORD": r'\b(if|else|while|for|return|int|str|float|void|class|def|print)\b',
     "IDENTIFIER": r'\b[a-zA-Z_][a-zA-Z0-9_]*\b',
     "NUMBER": r'\b\d+\b',
     "OPERATOR": r'<=|>=|==|!=|&&|"|[\+\-\*/=<>\!\||\|\']',
@@ -39,8 +40,9 @@ class NodoAST:
 class NodoPrograma(NodoAST):
     def __init__(self, funciones):
         self.funciones = funciones
-        self.main = None
         self.variables = set()  # Conjunto para almacenar variables
+        self.analizador_semantico = AnalizadorSemantico()
+        self.analisis = self.analizador_semantico.analizar(self)
 
     def recolectar_variables(self, nodo):
         # Recorre el AST y extrae los nombres de las variables.
@@ -68,6 +70,7 @@ class NodoPrograma(NodoAST):
 
     def generar_codigo(self):
         # Genera el código ensamblador incluyendo las variables en .data automáticamente
+
         self.variables = set()  # Resetear variables
         for funcion in self.funciones:
             self.recolectar_variables(funcion)
@@ -76,16 +79,17 @@ class NodoPrograma(NodoAST):
         # Para agregar las funciones de imprimir = %include 'funciones.asm'
         codigo.append(f"%include 'funciones.asm'")
 
-
         # Sección de datos (incluye variables detectadas)
         codigo.append("section .data")
         for var in self.variables:
+
+            # Se debe implementar que dependiendo del tipo de variable se reserve el espacio necesario
+
             codigo.append(f"   {var} dd 0")  # entero de 32 bits
         # Agregar variable salto de línea
         codigo.append("   newline db 0xA")  # Salto de línea
         codigo.append("section .bss")
         codigo.append("   char resb 16") # Reservar espacio para un carácter
-
         # Sección de código
         codigo.append("section .text")
         codigo.append("   global _start")
@@ -96,14 +100,10 @@ class NodoPrograma(NodoAST):
                 codigo.append("_start:")
                 for instruccion in funcion.cuerpo:
                     codigo.append(instruccion.generar_codigo())
-                codigo.append("   mov eax, 1")  # sys_exit
-                codigo.append("   xor ebx, ebx")
-                codigo.append("   int 0x80")
+                codigo.append("   call quit")  # sys_exit
             else:
                 codigo.append(funcion.generar_codigo())    
         # Función para imprimir un numero
-        
-
         return "\n".join(codigo)
     
     def traducir(self):
@@ -266,6 +266,7 @@ class NodoNumero(NodoAST):
     
     def generar_codigo(self):
         return f'   mov eax, {self.valor} ; Cargar número {self.valor} en eax'
+    
 
 class NodoWhile(NodoAST):
     # Nodo que representa a un ciclo while
@@ -370,11 +371,22 @@ class NodoPrint(NodoAST):
         self.variable = variable
 
     def generar_codigo(self):
-            codigo = [
-                self.variable.generar_codigo(),  # Obtener valor en eax",
-                "   call printnum",  # Llamar a la función de impresión
-            ]
-            return "\n".join(codigo)
+        # Generar código para imprimir la variable
+        codigo = []
+        # Cargar la variable en eax
+        codigo.append(self.variable.generar_codigo())
+        
+        # Verificar si la variable es numerica o str, dependiendo de eso se llama a printStr o printnum
+        if isinstance(self.variable, NodoIdentificador):
+            # Si es un identificador, verificar su tipo
+            if self.variable.nombre[1] == 'str':
+                codigo.append('   call printStr')
+            else:
+                codigo.append('   call printnum')
+        elif isinstance(self.variable, NodoNumero):
+            # Si es un número, llamar a printnum
+            codigo.append('   call printnum')
+        return "\n".join(codigo)
 
 class NodoLlamadaFuncion(NodoAST):
     def __init__(self, nombre, argumentos):

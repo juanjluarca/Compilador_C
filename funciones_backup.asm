@@ -1,4 +1,3 @@
-
 ;---------------------- Imprimir cadena ----------- 
 printStr:
     ; Guardar registros en pila
@@ -20,7 +19,6 @@ printStr:
     pop ebx
     pop ecx
     pop edx
-    ret
 
 quit:
     mov ebx, 0    ; return 0 status on exit
@@ -49,13 +47,6 @@ finLen:
 
 printnum:
 
-    push edx
-    push ecx
-    push ebx
-    push eax ; Acá apunta al numero
-
-
-    pop eax
     ; Convertir número a string (maneja múltiples dígitos)
     mov ecx, 10         ; Divisor para conversión
     mov edi, char+11
@@ -84,11 +75,6 @@ convert_loop:
     mov ecx, edi        ; Puntero al string
     mov edx, esi        ; Longitud (dígitos + newline)
     int 0x80
-
-    pop     ebx
-    pop     ecx
-    pop     edx
-
-
     ret  ; Retornar de la función printnum
+
 
