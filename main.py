@@ -7,6 +7,7 @@ texto = """
 
 int funcion(int a, int b, int c) {
     c = a + b;
+    print("Hola mundo prueba de impresion");
     print(c);
     return c;
 }
@@ -198,10 +199,29 @@ class Parser:
     def sentencia_print(self):
         self.coincidir('KEYWORD')  # print
         self.coincidir('DELIMITER')  # (
-        variable = self.coincidir('IDENTIFIER')
+        es_cadena = False
+        # Verificar si es un identificador o una cadena
+        if self.obtener_token_actual()[0] == "IDENTIFIER":
+            variable = self.coincidir('IDENTIFIER')
+        # Verificar si es el inicio de una cadena mediante comillas
+        elif self.obtener_token_actual()[0] == "OPERATOR" and self.obtener_token_actual()[1] == '"':
+            es_cadena = True
+            self.coincidir('OPERATOR')  # "
+            cadena = []
+            while self.obtener_token_actual()[1] != '"':
+                caracter = self.coincidir('IDENTIFIER')[1]
+                # print(caracter)
+                cadena.append(caracter) # Se guardan los caracteres de la cadena
+            self.coincidir('OPERATOR') # "
+            variable = " ".join(cadena) 
         self.coincidir('DELIMITER')  # )
         self.coincidir('DELIMITER')  # ;
-        return NodoPrint(NodoIdentificador(variable))  # Aquí se guarda la variable en el nodo print
+        if es_cadena:
+            print(variable)
+            return NodoPrint(NodoCadena(variable))
+        else:
+            print(variable)
+            return NodoPrint(NodoIdentificador(variable))  # Aquí se guarda la variable en el nodo print
 
     def sentencia_for(self):
         self.coincidir('KEYWORD')  # for
@@ -292,7 +312,7 @@ try:
     parser = Parser(token)
     arbol_ast = parser.parsear()
 
-    print(arbol_ast)
+    # print(arbol_ast)
     # analizador_semantico = AnalizadorSemantico()
     
     

@@ -17,7 +17,7 @@ SECTION .text
     global main
 
 main:
-    push    rbp     
+    push    rbp
     fld     qword [diametro]   ; carga el radio al registro ST0
     fmul    qword [pi]         ; diametro * pi
     fstp    qword [c]          ; guarda el resultado de ST0 en c

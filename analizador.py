@@ -1,5 +1,5 @@
 import re
-from analisis_semantico import AnalizadorSemantico, TablaSimbolos
+# from analisis_semantico import AnalizadorSemantico, TablaSimbolos
 
 # Op relacional = <, >, =, !, <=, >=, ==, !=,
 # Op lógicos = &, &&, |, ||, !
@@ -40,40 +40,42 @@ class NodoAST:
 class NodoPrograma(NodoAST):
     def __init__(self, funciones):
         self.funciones = funciones
-        self.variables = set()  # Conjunto para almacenar variables
         self.analizador_semantico = AnalizadorSemantico()
-        self.analisis = self.analizador_semantico.analizar(self)
+        self.analisis = None
 
-    def recolectar_variables(self, nodo):
-        # Recorre el AST y extrae los nombres de las variables.
-        if isinstance(nodo, NodoAsignacion):
-            self.variables.add(nodo.nombre[1])  # Guardar la variable
-        elif isinstance(nodo, NodoIdentificador):
-            self.variables.add(nodo.nombre[1])
-        elif isinstance(nodo, NodoFuncion):
-            # Recolectar variables de los parámetros
-            for param in nodo.parametros:
-                self.variables.add(param.nombre[1])
-            # Recolectar variables del cuerpo de la función
-            for instruccion in nodo.cuerpo:
-                self.recolectar_variables(instruccion)
-        elif isinstance(nodo, NodoOperacion):
-            self.recolectar_variables(nodo.izquierda)
-            self.recolectar_variables(nodo.derecha)
-        elif isinstance(nodo, NodoIf) or isinstance(nodo, NodoWhile) or isinstance(nodo, NodoFor):
-            self.recolectar_variables(nodo.condicion)
-            for instruccion in nodo.cuerpo:
-                self.recolectar_variables(instruccion)
-            if hasattr(nodo, 'sino') and nodo.sino:
-                for instruccion in nodo.sino:
-                    self.recolectar_variables(instruccion)
+    # def recolectar_variables(self, nodo):
+    #     # Recorre el AST y extrae los nombres de las variables.
+    #     if isinstance(nodo, NodoAsignacion):
+    #         self.variables.add(nodo.nombre[1])  # Guardar la variable
+    #     elif isinstance(nodo, NodoIdentificador):
+    #         self.variables.add(nodo.nombre[1])
+    #     elif isinstance(nodo, NodoFuncion):
+    #         # Recolectar variables de los parámetros
+    #         for param in nodo.parametros:
+    #             self.variables.add(param.nombre[1])
+    #         # Recolectar variables del cuerpo de la función
+    #         for instruccion in nodo.cuerpo:
+    #             self.recolectar_variables(instruccion)
+    #     elif isinstance(nodo, NodoOperacion):
+    #         self.recolectar_variables(nodo.izquierda)
+    #         self.recolectar_variables(nodo.derecha)
+    #     elif isinstance(nodo, NodoIf) or isinstance(nodo, NodoWhile) or isinstance(nodo, NodoFor):
+    #         self.recolectar_variables(nodo.condicion)
+    #         for instruccion in nodo.cuerpo:
+    #             self.recolectar_variables(instruccion)
+    #         if hasattr(nodo, 'sino') and nodo.sino:
+    #             for instruccion in nodo.sino:
+    #                 self.recolectar_variables(instruccion)
 
     def generar_codigo(self):
         # Genera el código ensamblador incluyendo las variables en .data automáticamente
+        self.analisis = self.analizador_semantico.analizar(self)
 
-        self.variables = set()  # Resetear variables
-        for funcion in self.funciones:
-            self.recolectar_variables(funcion)
+        # Ahora self.analizador_semantico contiene las tablas de variables y funciones
+
+        self.variables = self.analizador_semantico.tabla_simbolos.variables  # Resetear variables
+        # for funcion in self.funciones:
+        #     self.recolectar_variables(funcion)
 
         codigo = []
         # Para agregar las funciones de imprimir = %include 'funciones.asm'
@@ -81,11 +83,19 @@ class NodoPrograma(NodoAST):
 
         # Sección de datos (incluye variables detectadas)
         codigo.append("section .data")
-        for var in self.variables:
-
+        for var, tipo in self.variables.items():
             # Se debe implementar que dependiendo del tipo de variable se reserve el espacio necesario
+            if tipo == 'int':
+                codigo.append(f"   {var} dd 0")
+            elif tipo == 'float':
+                codigo.append(f"   {var} dd 0.0")
+            elif tipo == 'str':
+                # Reservar espacio para una cadena de caracteres
+                codigo.append(f"   {var} db 0x00")
+            elif tipo == 'char':
+                # Reservar espacio para un carácter
+                codigo.append(f"   {var} db 0x00")
 
-            codigo.append(f"   {var} dd 0")  # entero de 32 bits
         # Agregar variable salto de línea
         codigo.append("   newline db 0xA")  # Salto de línea
         codigo.append("section .bss")
@@ -267,6 +277,15 @@ class NodoNumero(NodoAST):
     def generar_codigo(self):
         return f'   mov eax, {self.valor} ; Cargar número {self.valor} en eax'
     
+class NodoCadena(NodoAST):
+    def __init__(self, valor):
+        self.valor = valor
+
+    def traducir(self):
+        return f'"{self.valor}"'
+    
+    def generar_codigo(self):
+        return f'   mov eax, "{self.valor}" ; Cargar cadena {self.valor} en eax'
 
 class NodoWhile(NodoAST):
     # Nodo que representa a un ciclo while
@@ -408,3 +427,86 @@ class NodoLlamadaFuncion(NodoAST):
         
         return "\n".join(codigo)
     
+
+
+#------------------------- Análisis semántico -------------------------
+class TablaSimbolos:
+    def __init__(self):
+        self.variables = {} # Almacena variables {nombre: tipo}
+        self.funciones = {} # Almacena funciones {nombre: (tipo_retorno, [parametros])}
+
+    def declarar_variable(self, nombre, tipo):
+        if nombre in self.variables:
+            raise Exception(f"Error: Variable '{nombre}' ya declarada")
+        self.variables[nombre] = tipo
+
+
+    def obtener_tipo_variable(self, nombre):
+        if nombre not in self.variables:
+            raise Exception(f"Error: Variable '{nombre}' no declarada")
+        return self.variables[nombre]
+
+    def declarar_funcion(self, nombre, tipo_retorno, parametros):
+        if nombre in self.funciones:
+            raise Exception(f"Error: Función '{nombre}' ya declarada")
+        self.funciones[nombre] = (tipo_retorno, parametros)
+    
+    def obtener_info_funcion(self, nombre):
+        if nombre not in self.funciones:
+            raise Exception(f"Error: Función '{nombre}' no declarada")
+        return self.funciones[nombre]
+
+
+
+class AnalizadorSemantico:
+    def __init__(self):
+        self.tabla_simbolos = TablaSimbolos()
+    def analizar(self, nodo):
+        if isinstance(nodo, NodoAsignacion):
+            tipo_expr = self.analizar(nodo.expresion)
+            # Verificar si la variable ya existe (puede ser un parámetro)
+            if nodo.nombre[1] not in self.tabla_simbolos.variables:
+                self.tabla_simbolos.declarar_variable(nodo.nombre[1], tipo_expr)
+            else:
+                # Si ya existe, verificar que los tipos coincidan
+                tipo_existente = self.tabla_simbolos.obtener_tipo_variable(nodo.nombre[1])
+                if tipo_existente != tipo_expr:
+                    raise Exception(f"Error: Tipo incompatible en asignación para '{nodo.nombre[1]}' (esperaba {tipo_existente}, recibió {tipo_expr})")
+        elif isinstance(nodo, NodoIdentificador):
+            return self.tabla_simbolos.obtener_tipo_variable(nodo.nombre[1])
+        elif isinstance(nodo, NodoNumero):
+            # Comprobar si el número es entero o decimal
+            if isinstance(nodo.valor, int):
+                return "int"
+            elif isinstance(nodo.valor, float):
+                return "float"
+            return "int"  # Por defecto, consideramos que es un entero
+        elif isinstance(nodo, NodoCadena):
+            return "str"
+        elif isinstance(nodo, NodoOperacion):
+            tipo_izq = self.analizar(nodo.izquierda)
+            tipo_der = self.analizar(nodo.derecha)
+            if tipo_izq != tipo_der:
+                raise Exception(f"Error: Tipos incompatibles {tipo_izq} {nodo.operador[1]} {tipo_der}")
+            return tipo_izq
+        elif isinstance(nodo, NodoFuncion):
+            # Registrar la función en la tabla de símbolos
+            self.tabla_simbolos.declarar_funcion(nodo.nombre[1], nodo.tipo_retorno[1], nodo.parametros)
+            
+            # Registrar los parámetros en la tabla de variables
+            for param in nodo.parametros:
+                self.tabla_simbolos.declarar_variable(param.nombre[1], param.tipo[1])
+            
+            # Analizar el cuerpo de la función
+            for instruccion in nodo.cuerpo:
+                self.analizar(instruccion)
+        elif isinstance(nodo, NodoLlamadaFuncion):
+            tipo_retorno, parametros = self.tabla_simbolos.obtener_info_funcion(nodo.nombre[1])
+            if len(nodo.argumentos) != len(parametros):
+                raise Exception(f"Error: La función '{nodo.nombre[1]}' espera {len(parametros)} argumentos, pero recibió {len(nodo.argumentos)}")
+            return tipo_retorno
+        elif isinstance(nodo, NodoPrograma):
+            for funcion in nodo.funciones:
+                self.analizar(funcion)
+        elif isinstance(nodo, NodoRetorno):
+            tipo_expr = self.analizar(nodo.expresion)

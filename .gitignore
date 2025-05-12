@@ -45,3 +45,11 @@ $RECYCLE.BIN/
 *.cache
 logs/
 debug.log
+
+
+# Archivos de compilación y archivos objeto
+*.class
+*.jar
+*.war
+*.lst
+

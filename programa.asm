@@ -1,11 +1,11 @@
 %include 'funciones.asm'
 section .data
-   z dd 0
+   a dd 0
+   b dd 0
+   c dd 0
    x dd 0
    y dd 0
-   c dd 0
-   b dd 0
-   a dd 0
+   z dd 0
    newline db 0xA
 section .bss
    char resb 16
@@ -24,6 +24,7 @@ funcion:
    pop ebx; recuperar el primer operando
    add eax, ebx; eax = eax + ebx
    mov [c], eax; Guardar resultado en c
+   mov eax, "Hola mundo prueba de impresion" ; Cargar cadena Hola mundo prueba de impresion en eax
    mov eax, [c] ; Cargar variable c en eax
    call printnum
    mov eax, [c] ; Cargar variable c en eax
