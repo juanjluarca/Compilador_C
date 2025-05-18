@@ -5,19 +5,29 @@ from analisis_semantico import AnalizadorSemantico
 
 texto = """ 
 
-int funcion(int a, int b, int c) {
-    c = a + b;
-    print("Hola mundo prueba de impresion");
+int suma(int a, int b) {
+    int c = a + b;
     print(c);
     return c;
 }
 
+
 int main() {
     int x = 8;
     int y = 5;
-    int z = 0;
-    funcion(x, y, z);
-    return z;
+    int z = 2;
+    str var = "Hola Mundo";
+
+    print(x);
+
+    print("La variable es: ");
+
+        int variable = z + 2;
+
+    print(variable);
+
+    suma(x, y);
+
 }
 """
 
@@ -32,7 +42,7 @@ class Parser:
     def obtener_token_actual(self):
         return self.tokens[self.pos] if self.pos < len(self.tokens) else None
 
-    def coincidir(self, tipo_esperado):
+    def coincidir(self, tipo_esperado): # Devuelve el token en formato (tipo, valor)
         token_actual = self.obtener_token_actual()
         if token_actual and token_actual[0] == tipo_esperado:
             self.pos += 1
@@ -104,9 +114,7 @@ class Parser:
                 instrucciones.append(self.sentencia_if())
             elif self.obtener_token_actual()[1] == 'print':
                 instrucciones.append(self.sentencia_print())
-            elif (self.obtener_token_actual()[0] == 'IDENTIFIER' and 
-                self.pos + 1 < len(self.tokens) and 
-                self.tokens[self.pos + 1][1] == '('):
+            elif (self.obtener_token_actual()[0] == 'IDENTIFIER' and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1][1] == '('):
                 instrucciones.append(self.llamada_funcion())
             else:
                 instrucciones.append(self.asignacion())
@@ -150,9 +158,17 @@ class Parser:
     def termino(self):
         token = self.obtener_token_actual()
         if token[0] == "IDENTIFIER":
-            return NodoIdentificador(self.coincidir("IDENTIFIER"))
+            return NodoIdentificador(self.coincidir("IDENTIFIER"), 'None')
         elif token[0] == "NUMBER":
             return NodoNumero(int(self.coincidir("NUMBER")[1]))
+        elif token[1] == '"': # Si es una cadena
+            self.coincidir("OPERATOR")
+            cadena = []
+            while self.obtener_token_actual()[1] != '"':
+                palabra = self.coincidir("IDENTIFIER")[1]
+                cadena.append(palabra)
+            self.coincidir("OPERATOR")
+            return NodoCadena(" ".join(cadena))
         else:
             raise SyntaxError(f"Error de sintaxis: se esperaba un identificador o un número, pero se encontró {token}")
 
@@ -172,8 +188,6 @@ class Parser:
             return NodoIf(condicion, cuerpo, sino)
         return NodoIf(condicion, cuerpo)
     
-
-
     def sentencia_while(self):
         self.coincidir('KEYWORD')  # while
         self.coincidir('DELIMITER')  # (
@@ -183,17 +197,6 @@ class Parser:
         cuerpo = self.cuerpo()
         self.coincidir('DELIMITER')  # Se espera un "}"
         return NodoWhile(condicion, cuerpo)
-
-    def contenido(self):
-        token = self.obtener_token_actual()
-        if token[0] == "OPERATOR":
-            return self.coincidir("OPERATOR")[1]
-        elif token[0] == "IDENTIFIER":
-            return self.coincidir("IDENTIFIER")[1]
-        elif token[0] == "NUMBER":
-            return self.coincidir("NUMBER")[1]
-        else:
-            return ""
 
     # print(x);
     def sentencia_print(self):
@@ -209,19 +212,17 @@ class Parser:
             self.coincidir('OPERATOR')  # "
             cadena = []
             while self.obtener_token_actual()[1] != '"':
-                caracter = self.coincidir('IDENTIFIER')[1]
+                palabra = self.coincidir('IDENTIFIER')[1]
                 # print(caracter)
-                cadena.append(caracter) # Se guardan los caracteres de la cadena
+                cadena.append(palabra) # Se guardan los caracteres de la cadena
             self.coincidir('OPERATOR') # "
             variable = " ".join(cadena) 
         self.coincidir('DELIMITER')  # )
         self.coincidir('DELIMITER')  # ;
         if es_cadena:
-            print(variable)
             return NodoPrint(NodoCadena(variable))
         else:
-            print(variable)
-            return NodoPrint(NodoIdentificador(variable))  # Aquí se guarda la variable en el nodo print
+            return NodoPrint(NodoIdentificador(variable, 'int'))  # Aquí se guarda la variable en el nodo print
 
     def sentencia_for(self):
         self.coincidir('KEYWORD')  # for

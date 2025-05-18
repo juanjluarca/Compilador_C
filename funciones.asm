@@ -17,6 +17,18 @@ printStr:
     mov eax, 4    ; SYS_WRITE (Kernel opcode 4)
     int 80h       ; Se imprime en pantalla
 
+    ; ----- salto de línea -----
+    push eax      ; Preservar eax
+    mov eax, 4    ; SYS_WRITE
+    mov ebx, 1    ; STDOUT
+    mov ecx, newline ; Dirección del salto de línea
+    mov edx, 1    ; Longitud 1 byte
+    int 80h
+    pop eax       ; Restaurar eax
+    ; ----------------------------------
+
+
+
     pop ebx
     pop ecx
     pop edx

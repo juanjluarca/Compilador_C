@@ -2,6 +2,8 @@
 ; 21 abr 2025
 ; Compilar:     nasm -f elf64 flotante.asm -l flotante.lst
 ; link:         gcc -m64 flotante.o -o flotante -no-pie
+; ejecución:    ./flotante
+
 
 extern printf
 

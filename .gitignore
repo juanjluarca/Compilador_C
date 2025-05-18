@@ -39,17 +39,10 @@ $RECYCLE.BIN/
 *.dll
 *.so
 *.a
+*.lst
 
 # Archivos de logs y caché
 *.log
 *.cache
 logs/
 debug.log
-
-
-# Archivos de compilación y archivos objeto
-*.class
-*.jar
-*.war
-*.lst
-

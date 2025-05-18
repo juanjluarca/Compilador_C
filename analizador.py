@@ -43,6 +43,8 @@ class NodoPrograma(NodoAST):
         self.analizador_semantico = AnalizadorSemantico()
         self.analisis = None
 
+
+
     # def recolectar_variables(self, nodo):
     #     # Recorre el AST y extrae los nombres de las variables.
     #     if isinstance(nodo, NodoAsignacion):
@@ -74,8 +76,7 @@ class NodoPrograma(NodoAST):
         # Ahora self.analizador_semantico contiene las tablas de variables y funciones
 
         self.variables = self.analizador_semantico.tabla_simbolos.variables  # Resetear variables
-        # for funcion in self.funciones:
-        #     self.recolectar_variables(funcion)
+        self.cadenas = self.analizador_semantico.tabla_simbolos.cadenas  # Resetear cadenas
 
         codigo = []
         # Para agregar las funciones de imprimir = %include 'funciones.asm'
@@ -95,6 +96,10 @@ class NodoPrograma(NodoAST):
             elif tipo == 'char':
                 # Reservar espacio para un carácter
                 codigo.append(f"   {var} db 0x00")
+        # Agregar cadenas a la sección de datos
+        for nombre, valor in self.cadenas.items():
+            # Reservar espacio para la cadena
+            codigo.append(f"   {nombre} db '{valor}', 0")
 
         # Agregar variable salto de línea
         codigo.append("   newline db 0xA")  # Salto de línea
@@ -254,18 +259,30 @@ class NodoRetorno(NodoAST):
         return f"return {self.expresion.traducir()}"
 
     def generar_codigo(self):
-        return self.expresion.generar_codigo() + '\n   ret ; Retornar desde la subrutina'
+        codigo = self.expresion.generar_codigo()
+        return f"{codigo}\n   ret ; Retornar desde la subrutina"
 
 class NodoIdentificador(NodoAST):
     # Nodo que representa a un identificador
-    def __init__(self, nombre):
-        self.nombre = nombre
+    def __init__(self, nombre, tipo):
+        self.nombre = nombre # Formato ('tipo', 'valor')
+        self.tipo = tipo
 
     def traducir(self):
         return self.nombre[1]
 
     def generar_codigo(self):
-        return f'   mov eax, [{self.nombre[1]}] ; Cargar variable {self.nombre[1]} en eax'
+        # print(f"Generando código para {self.nombre}")
+        if self.tipo == 'int':
+            return f'   mov eax, [{self.nombre[1]}] ; Cargar variable {self.nombre[1]} en eax'
+        elif self.tipo == 'float':
+            return f'   mov eax, [{self.nombre[1]}] ; Cargar variable {self.nombre[1]} en eax'
+        elif self.tipo == 'str':
+            return f'   mov eax, {self.nombre[1]} ; Cargar variable {self.nombre[1]} en eax'
+        elif self.tipo == 'char':
+            return f'   mov eax, [{self.nombre[1]}] ; Cargar variable {self.nombre[1]} en eax'
+        else:
+            return f'   mov eax, [{self.nombre[1]}] ; Cargar variable {self.nombre[1]} en eax'
 
 class NodoNumero(NodoAST):
     def __init__(self, valor):
@@ -277,15 +294,6 @@ class NodoNumero(NodoAST):
     def generar_codigo(self):
         return f'   mov eax, {self.valor} ; Cargar número {self.valor} en eax'
     
-class NodoCadena(NodoAST):
-    def __init__(self, valor):
-        self.valor = valor
-
-    def traducir(self):
-        return f'"{self.valor}"'
-    
-    def generar_codigo(self):
-        return f'   mov eax, "{self.valor}" ; Cargar cadena {self.valor} en eax'
 
 class NodoWhile(NodoAST):
     # Nodo que representa a un ciclo while
@@ -387,25 +395,42 @@ class NodoFor(NodoAST):
 class NodoPrint(NodoAST):
     # Nodo que representa a la función print
     def __init__(self, variable):
-        self.variable = variable
+        self.variable = variable # Puede ser un NodoIdentificador, NodoNumero o NodoCadena
 
     def generar_codigo(self):
-        # Generar código para imprimir la variable
         codigo = []
         # Cargar la variable en eax
         codigo.append(self.variable.generar_codigo())
         
-        # Verificar si la variable es numerica o str, dependiendo de eso se llama a printStr o printnum
+        # Determinar el tipo de variable para llamar a la función correcta
         if isinstance(self.variable, NodoIdentificador):
-            # Si es un identificador, verificar su tipo
-            if self.variable.nombre[1] == 'str':
+            # Verificar si es una cadena (comienza con "cadena_")
+            if self.variable.nombre[1].startswith('cadena_'):
                 codigo.append('   call printStr')
-            else:
+            elif self.variable.tipo == 'str':
+                # Si es una cadena, llamar a la función de impresión de cadenas
+                codigo.append('   call printStr')
+            elif self.variable.tipo == 'int':
+                # Si es un entero, llamar a la función de impresión de enteros
                 codigo.append('   call printnum')
+        elif isinstance(self.variable, NodoCadena):
+            # Para cadenas directas (aunque normalmente se convierten a identificadores)
+            codigo.append('   call printStr')
         elif isinstance(self.variable, NodoNumero):
-            # Si es un número, llamar a printnum
             codigo.append('   call printnum')
+            
         return "\n".join(codigo)
+
+class NodoCadena(NodoAST):
+    def __init__(self, valor):
+        self.valor = valor
+
+    def traducir(self):
+        return f'"{self.valor}"'
+    
+    def generar_codigo(self):
+        return f'   mov eax, {self.valor} ; Cargar cadena {self.valor} en eax'
+
 
 class NodoLlamadaFuncion(NodoAST):
     def __init__(self, nombre, argumentos):
@@ -434,12 +459,17 @@ class TablaSimbolos:
     def __init__(self):
         self.variables = {} # Almacena variables {nombre: tipo}
         self.funciones = {} # Almacena funciones {nombre: (tipo_retorno, [parametros])}
+        self.cadenas = {} # Almacena cadenas {nombre: valor}
+
+    def declarar_cadena(self, nombre, valor):
+        if nombre in self.cadenas:
+            raise Exception(f"Error: Cadena '{nombre}' ya declarada")
+        self.cadenas[nombre] = valor
 
     def declarar_variable(self, nombre, tipo):
         if nombre in self.variables:
             raise Exception(f"Error: Variable '{nombre}' ya declarada")
         self.variables[nombre] = tipo
-
 
     def obtener_tipo_variable(self, nombre):
         if nombre not in self.variables:
@@ -456,11 +486,12 @@ class TablaSimbolos:
             raise Exception(f"Error: Función '{nombre}' no declarada")
         return self.funciones[nombre]
 
-
+# start llama a main
 
 class AnalizadorSemantico:
     def __init__(self):
         self.tabla_simbolos = TablaSimbolos()
+        self.contador_cadenas = 0
     def analizar(self, nodo):
         if isinstance(nodo, NodoAsignacion):
             tipo_expr = self.analizar(nodo.expresion)
@@ -472,6 +503,17 @@ class AnalizadorSemantico:
                 tipo_existente = self.tabla_simbolos.obtener_tipo_variable(nodo.nombre[1])
                 if tipo_existente != tipo_expr:
                     raise Exception(f"Error: Tipo incompatible en asignación para '{nodo.nombre[1]}' (esperaba {tipo_existente}, recibió {tipo_expr})")
+        elif isinstance(nodo, NodoPrint):
+    # Verificar si el contenido del print es una cadena para agregarla a la tabla de símbolos
+            if isinstance(nodo.variable, NodoCadena):
+                nombre_cadena = f"cadena_{self.contador_cadenas}"
+                self.contador_cadenas += 1
+                self.tabla_simbolos.declarar_cadena(nombre_cadena, nodo.variable.valor)
+                nodo.variable = NodoIdentificador(('IDENTIFIER', nombre_cadena), 'str')  # Reemplazar la cadena por su nombre
+            elif isinstance(nodo.variable, NodoIdentificador):
+                # Verificar si la variable existe
+                self.tabla_simbolos.obtener_tipo_variable(nodo.variable.nombre[1])
+        
         elif isinstance(nodo, NodoIdentificador):
             return self.tabla_simbolos.obtener_tipo_variable(nodo.nombre[1])
         elif isinstance(nodo, NodoNumero):
