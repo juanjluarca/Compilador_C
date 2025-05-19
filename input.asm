@@ -11,6 +11,7 @@ SECTION .data
     msg1    db      'Ingrese su nombre: ', 0
     msg2    db      'Hola ', 0
     num     dd      88
+    newline db      0xA, 0
 
 SECTION .bss
     nombre  resb    20
@@ -23,11 +24,9 @@ _start:
     mov     eax, msg1
     call    printStr
 
-    mov     edx, 30         ; edx = espacio total para Lectura
-    mov     ecx, nombre     ; ecx = dir. de memoria para almacenar el dato
-    mov     ebx, 0          ; lee desde STDIN
-    mov     eax, 3          ; servicio de sistema SYS_READ
-    int     80h             ; llamada al sistema
+    mov     eax, nombre     ; buffer para almacenar el input
+    mov     ebx, 30         ; tamaño máximo del input
+    call    input
 
     mov     eax, msg2
     call    printStr
@@ -39,4 +38,3 @@ _start:
     call    printnum
 
     call    quit
-

@@ -6,7 +6,7 @@ import re
 # Definir patrones de tokens
 
 token_patron = {
-    "KEYWORD": r'\b(if|else|while|for|return|int|str|float|void|class|def|print)\b',
+    "KEYWORD": r'\b(if|else|while|for|return|int|str|float|void|class|def|print|input)\b',
     "IDENTIFIER": r'\b[a-zA-Z_][a-zA-Z0-9_]*\b',
     "NUMBER": r'\b\d+\b',
     "OPERATOR": r'<=|>=|==|!=|&&|"|[\+\-\*/=<>\!\||\|\']',
@@ -42,32 +42,6 @@ class NodoPrograma(NodoAST):
         self.funciones = funciones
         self.analizador_semantico = AnalizadorSemantico()
         self.analisis = None
-
-
-
-    # def recolectar_variables(self, nodo):
-    #     # Recorre el AST y extrae los nombres de las variables.
-    #     if isinstance(nodo, NodoAsignacion):
-    #         self.variables.add(nodo.nombre[1])  # Guardar la variable
-    #     elif isinstance(nodo, NodoIdentificador):
-    #         self.variables.add(nodo.nombre[1])
-    #     elif isinstance(nodo, NodoFuncion):
-    #         # Recolectar variables de los parámetros
-    #         for param in nodo.parametros:
-    #             self.variables.add(param.nombre[1])
-    #         # Recolectar variables del cuerpo de la función
-    #         for instruccion in nodo.cuerpo:
-    #             self.recolectar_variables(instruccion)
-    #     elif isinstance(nodo, NodoOperacion):
-    #         self.recolectar_variables(nodo.izquierda)
-    #         self.recolectar_variables(nodo.derecha)
-    #     elif isinstance(nodo, NodoIf) or isinstance(nodo, NodoWhile) or isinstance(nodo, NodoFor):
-    #         self.recolectar_variables(nodo.condicion)
-    #         for instruccion in nodo.cuerpo:
-    #             self.recolectar_variables(instruccion)
-    #         if hasattr(nodo, 'sino') and nodo.sino:
-    #             for instruccion in nodo.sino:
-    #                 self.recolectar_variables(instruccion)
 
     def generar_codigo(self):
         # Genera el código ensamblador incluyendo las variables en .data automáticamente
@@ -105,6 +79,7 @@ class NodoPrograma(NodoAST):
         codigo.append("   newline db 0xA")  # Salto de línea
         codigo.append("section .bss")
         codigo.append("   char resb 16") # Reservar espacio para un carácter
+        
         # Sección de código
         codigo.append("section .text")
         codigo.append("   global _start")
@@ -168,9 +143,10 @@ class NodoParametro(NodoAST):
 
 class NodoAsignacion(NodoAST):
     # Nodo que representa una asignación de variable
-    def __init__(self, nombre, expresion):
+    def __init__(self, nombre, expresion, tipo):
         self.nombre = nombre
         self.expresion = expresion
+        self.tipo = tipo
 
     def traducir(self):
         return f"{self.nombre[1]} = {self.expresion.traducir()}"
@@ -390,7 +366,23 @@ class NodoFor(NodoAST):
         codigo.append(f"{etiqueta_fin}:")
         
         return "\n".join(codigo)
-    
+
+
+class NodoInput(NodoAST):
+    # Nodo que representa la función input
+    def __init__(self, variable):
+        self.variable = variable  # Puede ser un NodoIdentificador
+
+    def generar_codigo(self):
+        codigo = []
+        # Llamar a la función de entrada
+        # La función input recibirá el valor en el buffer que se le envíe en eax
+        codigo.append(f'   mov eax, {self.variable[1]} ; Cargar dirección de la variable en eax')
+        # Llamar a la función input
+        codigo.append(f'   call input')
+        # Guardar el resultado en la variable
+        return "\n".join(codigo)
+
     
 class NodoPrint(NodoAST):
     # Nodo que representa a la función print
@@ -494,7 +486,9 @@ class AnalizadorSemantico:
         self.contador_cadenas = 0
     def analizar(self, nodo):
         if isinstance(nodo, NodoAsignacion):
+
             tipo_expr = self.analizar(nodo.expresion)
+            tipo = nodo.tipo
             # Verificar si la variable ya existe (puede ser un parámetro)
             if nodo.nombre[1] not in self.tabla_simbolos.variables:
                 self.tabla_simbolos.declarar_variable(nodo.nombre[1], tipo_expr)

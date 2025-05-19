@@ -33,7 +33,31 @@ printStr:
     pop ecx
     pop edx
     ret
+; ----------------------- funcion input --------------------
+input:
+    push    edx
+    push    ecx
+    push    ebx
+    push    eax
 
+    mov     ebx, 30 ; suponiendo un tamaño para la cadena de 30
+
+    mov     edx, ebx        ; edx = espacio total para lectura
+    mov     ecx, eax        ; ecx = dir. de memoria para almacenar el dato
+    mov     ebx, 0          ; lee desde STDIN
+    mov     eax, 3          ; servicio de sistema SYS_READ
+    int     80h             ; llamada al sistema
+
+    pop     eax
+    pop     ebx
+    pop     ecx
+    pop     edx
+    ret
+
+
+
+
+; --------------------- funcion de salida --------------------
 quit:
     mov ebx, 0    ; return 0 status on exit
     mov eax, 1    ; SYS_EXIT (kernel opcode 1)

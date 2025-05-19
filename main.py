@@ -1,32 +1,16 @@
 import json
 import subprocess
 from analizador import *
-from analisis_semantico import AnalizadorSemantico
 
 texto = """ 
-
-int suma(int a, int b) {
-    int c = a + b;
-    print(c);
-    return c;
-}
-
 
 int main() {
     int x = 8;
     int y = 5;
-    int z = 2;
-    str var = "Hola Mundo";
+    int z = 6;
 
-    print(x);
 
-    print("La variable es: ");
-
-        int variable = z + 2;
-
-    print(variable);
-
-    suma(x, y);
+    print(z);
 
 }
 """
@@ -114,6 +98,8 @@ class Parser:
                 instrucciones.append(self.sentencia_if())
             elif self.obtener_token_actual()[1] == 'print':
                 instrucciones.append(self.sentencia_print())
+            elif self.obtener_token_actual()[1] == 'input':
+                instrucciones.append(self.sentencia_input())
             elif (self.obtener_token_actual()[0] == 'IDENTIFIER' and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1][1] == '('):
                 instrucciones.append(self.llamada_funcion())
             else:
@@ -140,12 +126,13 @@ class Parser:
     
     def asignacion(self):
         if self.obtener_token_actual()[0] == "KEYWORD":
-            tipo = self.coincidir("KEYWORD")
-        nombre = self.coincidir("IDENTIFIER")
+            tipo = self.coincidir("KEYWORD")[1]
+            print(tipo)
+        nombre = self.coincidir("IDENTIFIER") # Guarda el nombre de la variable
         self.coincidir("OPERATOR")
         expresion = self.expresion()
         self.coincidir("DELIMITER")
-        return NodoAsignacion(nombre, expresion)
+        return NodoAsignacion(nombre, expresion, tipo)
 
     def expresion(self):
         izquierda = self.termino()
@@ -223,6 +210,14 @@ class Parser:
             return NodoPrint(NodoCadena(variable))
         else:
             return NodoPrint(NodoIdentificador(variable, 'int'))  # Aquí se guarda la variable en el nodo print
+        
+    def sentencia_input(self):
+        self.coincidir('KEYWORD') # input
+        self.coincidir('DELIMITER') # (
+        variable = self.coincidir('IDENTIFIER')
+        self.coincidir('DELIMITER') # )
+        self.coincidir('DELIMITER') # ;
+        return NodoInput(variable)  # Aquí se guarda la variable en el nodo input
 
     def sentencia_for(self):
         self.coincidir('KEYWORD')  # for
